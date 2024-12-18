@@ -1,9 +1,17 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { exec, spawn } from 'node:child_process';
 import { CardanoCliJs } from 'cardanocli-js';
+import { InjectRepository } from '@nestjs/typeorm';
+import { HydraNode } from './entities/HydraNode.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class HydraMainService implements OnModuleInit {
+  constructor(
+    @InjectRepository(HydraNode)
+    private hydraNodeRepository: Repository<HydraNode>,
+  ) {}
+
   cardanoNodeTip = {
     block: 0,
     epoch: 0,
@@ -23,51 +31,40 @@ export class HydraMainService implements OnModuleInit {
     // Check cardano node running
 
     await this.checkCardanoNodeRunning(cardanoNodePath);
+    try {
+      // test cli
+      const cardanocliJs = new CardanoCliJs({
+        shelleyGenesis: `${cardanoNodePath}/shelley-genesis.json`,
+        cliPath: 'docker exec cardano-node cardano-cli',
+        dir: cardanoNodePath,
+        era: '',
+        network: '1',
+        socketPath: `${cardanoNodePath}/node.socket`,
+      });
+      const updateCaranoNodeTip = () => {
+        setTimeout(() => {
+          const tip = cardanocliJs.query.tip();
+          if (!tip || !tip.syncProgress) {
+            console.log('Error while running "cardano-cli query tip"');
+            return;
+          }
+          const syncProgress = Number.parseFloat(tip.syncProgress);
+          this.cardanoNodeTip = tip;
+          console.log('[Cardano-cli][Node sync process]:', syncProgress);
+          if (syncProgress < 100) {
+            updateCaranoNodeTip();
+          }
+        }, 5000);
+      };
+      updateCaranoNodeTip();
 
-    // test cli
-    const cardanocliJs = new CardanoCliJs({
-      shelleyGenesis: `${cardanoNodePath}/shelley-genesis.json`,
-      cliPath: 'docker exec cardano-node cardano-cli',
-      dir: cardanoNodePath,
-      era: '',
-      network: '1',
-      socketPath: `${cardanoNodePath}/node.socket`,
-    });
-    const updateCaranoNodeTip = () => {
-      setTimeout(() => {
-        const tip = cardanocliJs.query.tip();
-        if (!tip || !tip.syncProgress) {
-          console.log('Error while running "cardano-cli query tip"');
-          return;
-        }
-        const syncProgress = Number.parseFloat(tip.syncProgress);
-        this.cardanoNodeTip = tip;
-        console.log('[Cardano-cli][Node sync process]:', syncProgress);
-        if (syncProgress < 100) {
-          updateCaranoNodeTip();
-        }
-      }, 5000);
-    };
-    updateCaranoNodeTip();
+      // get from database
+      const allHydraNode = await this.hydraNodeRepository.find();
+      console.log('>>> / file: hydra-main.service.ts:64 / allHydraNode:', allHydraNode);
+    } catch (error) {
+      console.log(error);
+    }
   }
-
-  // async checkValidCardanoCli() {
-  //   try {
-  //     exec('cardano-cli --version', (error, stdout, stderr) => {
-  //       if (error) {
-  //         console.error(`Error: ${error.message}`);
-  //         return;
-  //       }
-  //       if (stderr) {
-  //         console.error(`Stderr: ${stderr}`);
-  //         return;
-  //       }
-  //       console.log(`Stdout: ${stdout}`);
-  //     });
-  //   } catch (error) {
-  //     console.error(error);
-  //   }
-  // }
 
   async checkCardanoNodeRunning(cardanoNodePath: string): Promise<boolean> {
     const cardanoDockerServiceName = 'cardano-node';
