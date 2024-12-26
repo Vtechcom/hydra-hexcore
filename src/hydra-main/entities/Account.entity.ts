@@ -11,6 +11,11 @@ export class Account {
   })
   baseAddress: string;
 
+  @Column({
+    unique: true,
+  })
+  pointerAddress: string;
+
   @Exclude()
   @Column({
     unique: true,

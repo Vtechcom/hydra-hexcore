@@ -10,6 +10,7 @@ import { CreateAccountDto } from './dto/create-account.dto';
 import {
   getBaseAddressFromMnemonic,
   getSigningKeyFromMnemonic,
+  NetworkInfo,
   PaymentVerificationKey,
 } from 'src/utils/cardano-core';
 import { CreatePartyDto } from './dto/create-party.dto';
@@ -489,6 +490,7 @@ export class HydraMainService implements OnModuleInit {
       const cardanoAccount = {
         skey: cardanoSigningKey,
         vkey: new PaymentVerificationKey(cardanoSigningKey),
+        pointerAddress: new PaymentVerificationKey(cardanoSigningKey).toPointerAddress(1),
       };
       // create credentials files
       await this.writeFile(skeyFilePath, JSON.stringify(skey, null, 4));
