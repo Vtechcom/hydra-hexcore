@@ -25,6 +25,7 @@ import { WalletServer } from 'cardano-wallet-js';
 import { ResActivePartyDto } from './dto/response/active-party.dto';
 import { CommitHydraDto } from './dto/request/commit-hydra.dto';
 import axios from 'axios';
+import { SubmitTxHydraDto } from './dto/request/submit-tx-hydra.dto';
 
 @Injectable()
 export class HydraMainService implements OnModuleInit {
@@ -698,6 +699,47 @@ export class HydraMainService implements OnModuleInit {
         method: 'POST',
         data: {
           ...commitHydraDto.utxo,
+        },
+      });
+      if (rs.data && rs.status === 200) {
+        return rs.data;
+      }
+      throw new BadRequestException('Got error when commit to head');
+    } catch (err) {
+      console.log(err);
+      throw new BadRequestException('Got error when commit to head');
+    }
+  }
+
+  async submitTxToHydraNode(submitBody: SubmitTxHydraDto) {
+    // find the party and node
+    const partyId = submitBody.partyId;
+    const party = await this.hydraPartyRepository
+      .createQueryBuilder('party')
+      .where('party.id = :id', { id: partyId })
+      .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
+      .leftJoinAndSelect('hydraNodes.cardanoAccount', 'cardanoAccount')
+      .getOne();
+    if (!party) {
+      throw new BadRequestException('Invalid Party Id');
+    }
+    const hydraNode = party.hydraNodes.find((node) => node.id === submitBody.hydraHeadId);
+    if (!hydraNode) {
+      throw new BadRequestException('Invalid Hydra Head Id');
+    }
+    const hydraNodeInfo = {
+      protocol: 'http',
+      host: 'localhost',
+      port: hydraNode.port,
+    };
+    // submit utxo to node
+    try {
+      const rs = await axios({
+        baseURL: `${hydraNodeInfo.protocol}://${hydraNodeInfo.host}:${hydraNodeInfo.port}`,
+        url: '/cardano-transaction',
+        method: 'POST',
+        data: {
+          ...submitBody.transaction,
         },
       });
       if (rs.data && rs.status === 200) {

@@ -8,5 +8,5 @@ export class OpenHydraDto {
   hydraHeadId: number;
 
   @IsString()
-  transation: string;
+  transaction: string;
 }

@@ -14,6 +14,7 @@ import { CreatePartyDto } from './dto/create-party.dto';
 import { CreateHydraNodeDto } from './dto/create-hydra-node.dto';
 import { ReqActivePartyDto } from './dto/request/active-party.dto';
 import { CommitHydraDto } from './dto/request/commit-hydra.dto';
+import { SubmitTxHydraDto } from './dto/request/submit-tx-hydra.dto';
 
 @Controller('hydra-main')
 export class HydraMainController {
@@ -74,5 +75,10 @@ export class HydraMainController {
   @Post('commit-node')
   commitToHydraNode(@Body() commitHydraDto: CommitHydraDto) {
     return this.hydraMainService.commitToHydraNode(commitHydraDto);
+  }
+
+  @Post('submit-node')
+  submitToHydraNode(@Body() submitBody: SubmitTxHydraDto) {
+    return this.hydraMainService.submitTxToHydraNode(submitBody);
   }
 }
