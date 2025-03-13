@@ -45,10 +45,12 @@ export class HydraMainService implements OnModuleInit {
       process.env.NEST_CARDANO_NODE_SOCKER_PATH ||
       '/Users/macbookpro/hdev/workspaces/blockchain/hydra-manager/cardano-node/node.socket',
     hydraNodeImage:
-      process.env.NEST_HYDRA_NODE_IMAGE || 'ghcr.io/cardano-scaling/hydra-node:0.19.0',
+      process.env.NEST_HYDRA_NODE_IMAGE || 'ghcr.io/cardano-scaling/hydra-node:0.20.0',
     hydraNodeFolder:
       process.env.NEST_HYDRA_NODE_FOLDER ||
       '/Users/macbookpro/hdev/workspaces/blockchain/hydra-manager/hydra/preprod',
+    hydraNodeScriptTxId:
+      '5237b67923bf67e6691a09117c45fdc26c27911a8e2469d6a063a78da1c7c60a,5ed4032823e295b542d0cde0c5e531ca17c9834947400c05a50549607dbc3fa5,128af7ef4fd3fa8d1eda5cb1628aa2a1e8846d7685d91e0c6dae50b7d5f263b2',
   };
 
   private cardanoNode = {
@@ -300,7 +302,7 @@ export class HydraMainService implements OnModuleInit {
   async getListAccount() {
     const accounts = (await this.accountRepository.find()) as Array<Account & { utxo: any }>;
     for (const account of accounts) {
-      account.utxo = await this.cardanoCliQueryUtxo(account.baseAddress);
+      account.utxo = await this.cardanoCliQueryUtxo(account.pointerAddress);
     }
     return accounts.map((account) => new ResCardanoAccountDto(account));
   }
@@ -613,7 +615,7 @@ export class HydraMainService implements OnModuleInit {
           `/data/party-${party.id}/protocol-parameters.json`,
 
           `--hydra-scripts-tx-id`,
-          `03f8deb122fbbd98af8eb58ef56feda37728ec957d39586b78198a0cf624412a`,
+          `${this.CONSTANTS.hydraNodeScriptTxId}`,
 
           `--node-socket`,
           `/cardano-node/node.socket`,
