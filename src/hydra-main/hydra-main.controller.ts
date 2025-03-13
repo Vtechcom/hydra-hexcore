@@ -18,7 +18,7 @@ import { SubmitTxHydraDto } from './dto/request/submit-tx-hydra.dto';
 
 @Controller('hydra-main')
 export class HydraMainController {
-  constructor(private hydraMainService: HydraMainService) {}
+  constructor(private hydraMainService: HydraMainService) { }
 
   @Get('request-node')
   requestHydraNode() {

@@ -4,6 +4,9 @@ import {
   OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  MessageBody,
+  ConnectedSocket,
+  SubscribeMessage,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
@@ -27,5 +30,14 @@ export class HydraMainGateway implements OnGatewayInit, OnGatewayConnection, OnG
   // Example: Emit a message to all clients
   sendMessageToClients(data: string) {
     this.server.emit('message', data); // Broadcast a message to all connected clients
+  }
+
+  @SubscribeMessage('message')
+  async handleTyping(
+    @MessageBody() payload,
+    @ConnectedSocket() client: Socket,
+  ) {
+    console.log(payload.id, payload.room_id, client.id)
+
   }
 }

@@ -26,12 +26,13 @@ import { ResActivePartyDto } from './dto/response/active-party.dto';
 import { CommitHydraDto } from './dto/request/commit-hydra.dto';
 import axios from 'axios';
 import { SubmitTxHydraDto } from './dto/request/submit-tx-hydra.dto';
+import { log } from 'node:console';
 
 @Injectable()
 export class HydraMainService implements OnModuleInit {
   HYDRA_BIN_DIR_PATH =
     process.env.NEST_HYDRA_BIN_DIR_PATH ||
-    '/Users/macbookpro/hdev/workspaces/blockchain/hydra-manager/hydra/bin';
+    'D:/Projects/Vtechcom/cardano-node/hydra/bin';
 
   private docker: Docker;
   private CONSTANTS = {
@@ -40,15 +41,15 @@ export class HydraMainService implements OnModuleInit {
       process.env.NEST_CARDANO_NODE_IMAGE || 'ghcr.io/intersectmbo/cardano-node:10.1.4',
     cardanoNodeFolder:
       process.env.NEST_CARDANO_NODE_FOLDER ||
-      '/Users/macbookpro/hdev/workspaces/blockchain/hydra-manager/cardano-node',
+      'D:/Projects/Vtechcom/cardano-node',
     cardanoNodeSocketPath:
       process.env.NEST_CARDANO_NODE_SOCKER_PATH ||
-      '/Users/macbookpro/hdev/workspaces/blockchain/hydra-manager/cardano-node/node.socket',
+      'D:/Projects/Vtechcom/cardano-node/node.socket',
     hydraNodeImage:
       process.env.NEST_HYDRA_NODE_IMAGE || 'ghcr.io/cardano-scaling/hydra-node:0.19.0',
     hydraNodeFolder:
       process.env.NEST_HYDRA_NODE_FOLDER ||
-      '/Users/macbookpro/hdev/workspaces/blockchain/hydra-manager/hydra/preprod',
+      'D:/Projects/Vtechcom/cardano-node/hydra/preprod',
   };
 
   private cardanoNode = {
@@ -75,7 +76,7 @@ export class HydraMainService implements OnModuleInit {
     @InjectRepository(HydraParty)
     private hydraPartyRepository: Repository<HydraParty>,
   ) {
-    const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '/var/run/docker.sock';
+    const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
     this.docker = new Docker({ socketPath: DOCKER_SOCKET });
   }
 
