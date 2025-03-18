@@ -31,25 +31,20 @@ import { AddressUtxoDto } from './dto/response/address-utxo.dto';
 @Injectable()
 export class HydraMainService implements OnModuleInit {
   HYDRA_BIN_DIR_PATH =
-    process.env.NEST_HYDRA_BIN_DIR_PATH ||
-    'D:/Projects/Vtechcom/cardano-node/hydra/bin';
+    process.env.NEST_HYDRA_BIN_DIR_PATH || 'D:/Projects/Vtechcom/cardano-node/hydra/bin';
 
   private docker: Docker;
   private CONSTANTS = {
     cardanoNodeServiceName: process.env.NEST_CARDANO_NODE_SERVICE_NAME || 'cardano-node',
     cardanoNodeImage:
       process.env.NEST_CARDANO_NODE_IMAGE || 'ghcr.io/intersectmbo/cardano-node:10.1.4',
-    cardanoNodeFolder:
-      process.env.NEST_CARDANO_NODE_FOLDER ||
-      'D:/Projects/Vtechcom/cardano-node',
+    cardanoNodeFolder: process.env.NEST_CARDANO_NODE_FOLDER || 'D:/Projects/Vtechcom/cardano-node',
     cardanoNodeSocketPath:
-      process.env.NEST_CARDANO_NODE_SOCKER_PATH ||
-      'D:/Projects/Vtechcom/cardano-node/node.socket',
+      process.env.NEST_CARDANO_NODE_SOCKER_PATH || 'D:/Projects/Vtechcom/cardano-node/node.socket',
     hydraNodeImage:
       process.env.NEST_HYDRA_NODE_IMAGE || 'ghcr.io/cardano-scaling/hydra-node:0.20.0',
     hydraNodeFolder:
-      process.env.NEST_HYDRA_NODE_FOLDER ||
-      'D:/Projects/Vtechcom/cardano-node/hydra/preprod',
+      process.env.NEST_HYDRA_NODE_FOLDER || 'D:/Projects/Vtechcom/cardano-node/hydra/preprod',
     hydraNodeScriptTxId:
       '5237b67923bf67e6691a09117c45fdc26c27911a8e2469d6a063a78da1c7c60a,5ed4032823e295b542d0cde0c5e531ca17c9834947400c05a50549607dbc3fa5,128af7ef4fd3fa8d1eda5cb1628aa2a1e8846d7685d91e0c6dae50b7d5f263b2',
   };
@@ -654,8 +649,8 @@ export class HydraMainService implements OnModuleInit {
         name: nodeName,
         // Create name Room/Hydra Party for node
         Labels: {
-          'party_name': `party-${party.id.toString()}`,
-          'party_id': party.id.toString(),
+          party_name: `party-${party.id.toString()}`,
+          party_id: party.id.toString(),
         },
       });
       // @ts-ignore
