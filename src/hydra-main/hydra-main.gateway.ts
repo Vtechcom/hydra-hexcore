@@ -38,6 +38,6 @@ export class HydraMainGateway implements OnGatewayInit, OnGatewayConnection, OnG
     @ConnectedSocket() client: Socket,
   ) {
     console.log(payload.id, payload.room_id, client.id)
-
+    this.sendMessageToClients(payload.toString())
   }
 }

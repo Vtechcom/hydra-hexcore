@@ -392,7 +392,7 @@ export class HydraMainService implements OnModuleInit {
   }
 
   async genValidPort() {
-    const defaultPort = 6600;
+    const defaultPort = 10005;
     let port = defaultPort;
     while (!(await this.isPortAvailable(port))) {
       port++;
@@ -490,6 +490,7 @@ export class HydraMainService implements OnModuleInit {
       .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
       .leftJoinAndSelect('hydraNodes.cardanoAccount', 'cardanoAccount')
       .getOne();
+
     if (!party) {
       throw new BadRequestException('Invalid Party Id');
     }
@@ -642,6 +643,11 @@ export class HydraMainService implements OnModuleInit {
           [`${node.port + 1000}/tcp`]: {},
         },
         name: nodeName,
+        // Create name Room/Hydra Party for node
+        Labels: {
+          'party_name': `party-${party.id.toString()}`,
+          'party_id': party.id.toString(),
+        },
       });
       // @ts-ignore
       node.container = {
