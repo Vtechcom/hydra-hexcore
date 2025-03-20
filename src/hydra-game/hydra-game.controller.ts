@@ -62,27 +62,37 @@ export class HydraGameController {
         return this.hydraGameService.createRoom(createRoomDto);
     }
 
+    @UseInterceptors(ClassSerializerInterceptor)
+    @UseGuards(AuthGuard)
     @Get('rooms')
     getListGameRoom(@Query() query: any) {
         return this.hydraGameService.getListRoom(query);
     }
 
+    @UseInterceptors(ClassSerializerInterceptor)
+    @UseGuards(AuthGuard)
     @Get('room/:id')
     getGameRoom(@Param('id') id: number) {
         return this.hydraGameService.getRoom(id);
     }
 
+    @UseInterceptors(ClassSerializerInterceptor)
+    @UseGuards(AuthGuard)
     @Get('join-room/:id')
     getPortGameRoom(@Param('id') id: number) {
         return this.hydraGameService.getPortRoom(id);
     }
 
     // ********* GAME ROOM DETAIL ***********
+    @UseInterceptors(ClassSerializerInterceptor)
+    @UseGuards(AuthGuard)
     @Post('create-room-detail')
     createRoomDetail(@Body() createRoomDetailDto: CreateRoomDetailDto) {
         return this.hydraGameService.createRoomDetail(createRoomDetailDto);
     }
 
+    @UseInterceptors(ClassSerializerInterceptor)
+    @UseGuards(AuthGuard)
     @Delete('delete-room-detail/:id')
     deleteRoomDetail(@Param('id') id: number) {
         return this.hydraGameService.deleteRoomDetail(id);
