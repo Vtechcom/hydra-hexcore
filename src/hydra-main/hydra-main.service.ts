@@ -559,9 +559,9 @@ export class HydraMainService implements OnModuleInit {
         if (!party) {
             throw new BadRequestException('Invalid Party Id');
         }
-        if (party.status === 'ACTIVE') {
-            throw new BadRequestException('Party is already active');
-        }
+        // if (party.status === 'ACTIVE') {
+        //     throw new BadRequestException('Party is already active');
+        // }
         for (const node of party.hydraNodes) {
             const check = await this.checkUtxoAccount(node.cardanoAccount);
             if (!check) {
@@ -671,9 +671,6 @@ export class HydraMainService implements OnModuleInit {
                     '--port',
                     `${node.port + 1000}`,
 
-                    '--host',
-                    '0.0.0.0',
-
                     ...peerNodeParams,
 
                     `--hydra-signing-key`,
@@ -694,6 +691,7 @@ export class HydraMainService implements OnModuleInit {
                     `1`,
                 ],
                 HostConfig: {
+                    NetworkMode: 'host',
                     Binds: [
                         `${this.CONSTANTS.hydraNodeFolder}:/data`,
                         `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,

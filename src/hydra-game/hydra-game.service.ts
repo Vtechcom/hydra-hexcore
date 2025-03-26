@@ -39,7 +39,12 @@ export class HydraGameService implements OnModuleInit {
         this.docker = new Docker({ socketPath: DOCKER_SOCKET });
     }
 
-    async onModuleInit() { }
+    async onModuleInit() {
+
+        // Clear room detail
+        await this.gameRoomDetailRepository.clear()
+
+     }
 
     // ******** GAME RO0M **********
     async createRoom(body: CreateRoomDto) {
