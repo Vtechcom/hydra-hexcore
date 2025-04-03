@@ -1,19 +1,19 @@
 import { Exclude } from 'class-transformer';
-import { GameUser } from 'src/hydra-game/entities/User.entity';
+import { GameUser } from 'src/hydra-game/entities/GameUser.entity';
 
 export class ResUserInfoDto {
-  id: number;
+    id: number;
 
-  address: string;
+    address: string;
 
-  @Exclude()
-  password: string;
+    @Exclude()
+    password: string;
 
-  avatar: string;
+    avatar: string;
 
-  createdAt: string;
+    createdAt: string;
 
-  constructor(partial: Partial<GameUser>) {
-    Object.assign(this, partial);
-  }
+    constructor(partial: Partial<GameUser>) {
+        Object.assign(this, partial);
+    }
 }

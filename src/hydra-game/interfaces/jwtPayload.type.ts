@@ -1,6 +1,6 @@
-import { GameUser } from '../entities/User.entity';
+import { GameUser } from '../entities/GameUser.entity';
 
 export type JwtPayload = {
-  address: GameUser['address'];
-  id: GameUser['id'];
+    address: GameUser['address'];
+    id: GameUser['id'];
 };

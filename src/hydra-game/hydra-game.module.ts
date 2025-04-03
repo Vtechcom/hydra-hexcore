@@ -6,7 +6,7 @@ import { HydraGameController } from './hydra-game.controller';
 import { HydraNode } from '../hydra-main/entities/HydraNode.entity';
 import { Account } from '../hydra-main/entities/Account.entity';
 import { HydraParty } from '../hydra-main/entities/HydraParty.entity';
-import { GameUser } from './entities/User.entity';
+import { GameUser } from './entities/GameUser.entity';
 import { GameRoom } from './entities/Room.entity';
 import { GameRoomDetail } from './entities/RoomDetail.entity';
 import { JwtModule } from '@nestjs/jwt';

@@ -6,7 +6,7 @@ import { JwtPayload } from 'src/hydra-game/interfaces/jwtPayload.type';
 import { JwtHelper } from './jwt.helper';
 
 @Injectable()
-export class AuthGuard implements CanActivate {
+export class GameAuthGuard implements CanActivate {
     constructor(private jwtService: JwtService) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {

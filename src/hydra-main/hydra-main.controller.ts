@@ -114,4 +114,9 @@ export class HydraMainController {
     submitToHydraNode(@Body() submitBody: SubmitTxHydraDto) {
         return this.hydraMainService.submitTxToHydraNode(submitBody);
     }
+
+    @Get('active-nodes')
+    getActiveNodes() {
+        return this.hydraMainService.getActiveNodeContainers();
+    }
 }

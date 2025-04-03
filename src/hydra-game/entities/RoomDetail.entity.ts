@@ -1,6 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToOne, JoinColumn } from 'typeorm';
 import { GameRoom } from './Room.entity';
-import { GameUser } from './User.entity';
+import { GameUser } from './GameUser.entity';
 
 @Entity({
     name: 'game_room_detail',

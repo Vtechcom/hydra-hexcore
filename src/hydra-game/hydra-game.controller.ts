@@ -20,12 +20,12 @@ import { CreateRoomDto } from './dto/create-room.dto';
 import { CreateRoomDetailDto } from './dto/create-room-detail.dto';
 import { UserLoginDto } from './dto/user-login.dto';
 import { JwtPayload } from './interfaces/jwtPayload.type';
-import { AuthGuard } from 'src/auth/auth.guard';
+import { GameAuthGuard } from 'src/auth/game-auth.guard';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('hydra-game')
 export class HydraGameController {
-    constructor(private hydraGameService: HydraGameService) { }
+    constructor(private hydraGameService: HydraGameService) {}
 
     @UseInterceptors(ClassSerializerInterceptor)
     @Post('create-user')
@@ -41,7 +41,7 @@ export class HydraGameController {
     }
 
     @UseInterceptors(ClassSerializerInterceptor)
-    @UseGuards(AuthGuard)
+    @UseGuards(GameAuthGuard)
     @HttpCode(200)
     @Get('user-info')
     auth(@Req() req: any) {
@@ -50,7 +50,7 @@ export class HydraGameController {
     }
 
     @UseInterceptors(ClassSerializerInterceptor)
-    @UseGuards(AuthGuard)
+    @UseGuards(GameAuthGuard)
     @HttpCode(HttpStatus.OK)
     @Put('user-info')
     updateUserInfo(@Body() updateUserDto: UpdateUserDto, @Req() req: any) {
@@ -66,7 +66,7 @@ export class HydraGameController {
     }
 
     @UseInterceptors(ClassSerializerInterceptor)
-    @UseGuards(AuthGuard)
+    @UseGuards(GameAuthGuard)
     @HttpCode(200)
     @Delete('delete-user')
     deleteUser(@Req() req: any) {
@@ -81,14 +81,14 @@ export class HydraGameController {
     }
 
     @UseInterceptors(ClassSerializerInterceptor)
-    @UseGuards(AuthGuard)
+    @UseGuards(GameAuthGuard)
     @Get('rooms')
     getListGameRoom(@Query() query: any) {
         return this.hydraGameService.getListRoom(query);
     }
 
     @UseInterceptors(ClassSerializerInterceptor)
-    @UseGuards(AuthGuard)
+    @UseGuards(GameAuthGuard)
     @Get('room/:id')
     getGameRoom(@Param('id') id: number) {
         return this.hydraGameService.getRoom(id);

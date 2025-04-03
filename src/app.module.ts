@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HydraMainModule } from './hydra-main/hydra-main.module';
@@ -8,7 +8,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import configuration from './config/configuration';
-
+import { CacheModule } from '@nestjs/cache-manager';
+import { createKeyv, Keyv } from '@keyv/redis';
+import { CacheableMemory } from 'cacheable';
+import { HydraConsumerModule } from './hydra-consumer/hydra-consumer.module';
+import { ProxyMiddleware } from './middlewares/proxy/proxy.middleware';
 @Module({
     imports: [
         ConfigModule.forRoot({
@@ -17,6 +21,22 @@ import configuration from './config/configuration';
             isGlobal: true,
         }),
         ScheduleModule.forRoot(),
+        CacheModule.registerAsync({
+            isGlobal: true,
+            useFactory: async () => {
+                return {
+                    stores: [
+                        new Keyv({
+                            store: new CacheableMemory({ ttl: 60000, lruSize: 5000 }),
+                        }),
+                        createKeyv({
+                            url: configuration().redis.url,
+                            password: configuration().redis.password,
+                        }),
+                    ],
+                };
+            },
+        }),
         HydraMainModule,
         HydraGameModule,
         ShellModule,
@@ -27,8 +47,13 @@ import configuration from './config/configuration';
             }),
             inject: [ConfigService],
         }),
+        HydraConsumerModule,
     ],
     controllers: [AppController],
     providers: [AppService],
 })
-export class AppModule {}
+export class AppModule {
+    configure(consumer: MiddlewareConsumer) {
+        consumer.apply(ProxyMiddleware).forRoutes('*');
+    }
+}

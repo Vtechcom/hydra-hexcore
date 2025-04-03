@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 
 import { HydraParty } from '../hydra-main/entities/HydraParty.entity';
 import { HydraNode } from '../hydra-main/entities/HydraNode.entity';
-import { GameUser } from './entities/User.entity';
+import { GameUser } from './entities/GameUser.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GameRoom } from './entities/Room.entity';
 import { CreateRoomDto } from './dto/create-room.dto';
@@ -40,11 +40,9 @@ export class HydraGameService implements OnModuleInit {
     }
 
     async onModuleInit() {
-
         // Clear room detail
-        await this.gameRoomDetailRepository.clear()
-
-     }
+        await this.gameRoomDetailRepository.clear();
+    }
 
     // ******** GAME RO0M **********
     async createRoom(body: CreateRoomDto) {
@@ -220,7 +218,7 @@ export class HydraGameService implements OnModuleInit {
             where: { id },
             relations: ['party', 'party.hydraNodes', 'gameRoomDetails'],
         });
-        if (room.status === "INACTIVE") {
+        if (room.status === 'INACTIVE') {
             throw new BadRequestException('Room is INACTIVE');
         }
 
@@ -235,10 +233,8 @@ export class HydraGameService implements OnModuleInit {
 
         console.log(filteredHydraPorts);
 
-
-        return filteredHydraPorts
+        return filteredHydraPorts;
     }
-
 
     // ******** GAME RO0M DETAIL **********
     async createRoomDetail(body: CreateRoomDetailDto) {
@@ -247,8 +243,7 @@ export class HydraGameService implements OnModuleInit {
         });
         if (!user) {
             throw new BadRequestException('Invalid User');
-        }
-        else {
+        } else {
             const gameRoomDetail = await this.gameRoomDetailRepository.findOne({
                 where: { user: user },
             });
@@ -262,8 +257,7 @@ export class HydraGameService implements OnModuleInit {
         });
         if (!gameRoom) {
             throw new BadRequestException('Invalid Room');
-        }
-        else {
+        } else {
             const hydraNode = await this.hydraNodeRepository.findOne({
                 where: { party: gameRoom.party, port: body.port },
             });
@@ -275,7 +269,7 @@ export class HydraGameService implements OnModuleInit {
         const roomDetail = this.gameRoomDetailRepository.create({
             port: body.port,
             room: gameRoom,
-            user: user
+            user: user,
         });
         return this.gameRoomDetailRepository.save(roomDetail);
     }

@@ -13,6 +13,7 @@ export default () => ({
     },
     docker: {
         socketPath: process.env.NEST_DOCKER_SOCKET_PATH,
+        enableNetworkHost: process.env.NEST_DOCKER_ENABLE_NETWORK_HOST === 'true',
     },
     database: {
         type: 'mysql',
@@ -23,5 +24,9 @@ export default () => ({
         database: process.env.DB_DATABASE || 'hexcore',
         entities: [__dirname + '/../**/*.entity{.ts,.js}'],
         synchronize: process.env.DB_SYNCHRONIZE === 'true',
+    },
+    redis: {
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+        password: process.env.REDIS_PASSWORD || '',
     },
 });

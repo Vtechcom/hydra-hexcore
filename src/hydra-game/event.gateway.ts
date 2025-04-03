@@ -13,7 +13,7 @@ import { JwtHelper } from 'src/auth/jwt.helper';
 import { JwtPayload } from './interfaces/jwtPayload.type';
 import { jwtConstants } from 'src/constants';
 import { HydraGameService } from './hydra-game.service';
-import { GameUser } from './entities/User.entity';
+import { GameUser } from './entities/GameUser.entity';
 
 enum SocketEvent {
     JOIN_ROOM = 'join_room',

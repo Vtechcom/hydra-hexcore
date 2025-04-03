@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { HydraNode } from './entities/HydraNode.entity';
 import { In, Repository } from 'typeorm';
@@ -35,6 +35,18 @@ import { IPaginationOptions } from 'src/interfaces/pagination.type';
 import { HydraDto } from './dto/hydra.dto';
 
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import configuration from 'src/config/configuration';
+
+type ContainerNode = {
+    hydraNodeId: string;
+    hydraPartyId: string;
+    container: Docker.ContainerInfo;
+    isActive: boolean;
+};
+type Caching = {
+    activeNodes: ContainerNode[];
+};
 
 @Injectable()
 export class HydraMainService implements OnModuleInit {
@@ -52,6 +64,11 @@ export class HydraMainService implements OnModuleInit {
         hydraNodeScriptTxId:
             '5237b67923bf67e6691a09117c45fdc26c27911a8e2469d6a063a78da1c7c60a,5ed4032823e295b542d0cde0c5e531ca17c9834947400c05a50549607dbc3fa5,128af7ef4fd3fa8d1eda5cb1628aa2a1e8846d7685d91e0c6dae50b7d5f263b2',
         cardanoAccountMinLovelace: process.env.ACCOUNT_MINT_LOVELACE || 50000000,
+        enableNetworkHost: process.env.NEST_DOCKER_ENABLE_NETWORK_HOST === 'true',
+
+        // Dockerize
+        hydraPartyLabel: 'party_id',
+        hydraNodeLabel: 'node_id',
     };
 
     private cardanoNode = {
@@ -68,9 +85,6 @@ export class HydraMainService implements OnModuleInit {
         },
     };
 
-    private walletServer = WalletServer.init('https://dev-cardano-wallet.hdev99.io.vn/v2');
-    private activeNodes: Docker.ContainerInfo[] = [];
-
     constructor(
         @InjectRepository(HydraNode)
         private hydraNodeRepository: Repository<HydraNode>,
@@ -80,6 +94,7 @@ export class HydraMainService implements OnModuleInit {
         private hydraPartyRepository: Repository<HydraParty>,
         @InjectRepository(GameRoom)
         private gameRoomRepository: Repository<GameRoom>,
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {
         const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
         this.docker = new Docker({ socketPath: DOCKER_SOCKET });
@@ -149,32 +164,51 @@ export class HydraMainService implements OnModuleInit {
             '--testnet-magic',
             '1',
         ]);
-        console.log('>>> / file: hydra-main.service.ts:109 / output:', output);
         this.updateHydraContainerStatus();
         try {
             const tip = JSON.parse(this.cleanJSON(output));
             console.log('>>> / file: hydra-main.service.ts:121 / tip:', tip);
             this.cardanoNode.tip = tip;
+            await this.cacheManager.set('cardanoNodeTip', tip);
         } catch (err) {
             console.log(`Error parse json`, err);
         }
-
         return;
     }
 
     @Cron('*/10 * * * * *')
-    updateHydraContainerStatus() {
+    async updateHydraContainerStatus() {
         // Update hydra party status
         // Check container with "Name": "/hexcore-hydra-node-[ID]" that has running status
         // If all nodes are running, set party status to "ACTIVE"
         // Otherwise, set party status to "INACTIVE"
-
-        this.docker.listContainers({ all: true }).then(containers => {
-            const pattern = /hexcore-hydra-node-(\d+)/;
-            this.activeNodes = containers.filter(container => {
-                return container.Names.find(name => pattern.test(name)) && container.State === 'running';
+        this.docker
+            .listContainers({ all: true })
+            .then(containers => {
+                const pattern = /hexcore-hydra-node-(\d+)/;
+                const activeNodes = containers
+                    .filter(container => {
+                        return container.Names.find(name => pattern.test(name)) && container.State === 'running';
+                    })
+                    .map(node => {
+                        return {
+                            hydraNodeId: node.Labels[this.CONSTANTS.hydraNodeLabel],
+                            hydraPartyId: node.Labels[this.CONSTANTS.hydraPartyLabel],
+                            container: node,
+                            isActive: node.State === 'running',
+                        };
+                    });
+                this.cacheManager.set<Caching['activeNodes']>('activeNodes', activeNodes);
+            })
+            .catch(err => {
+                console.log('>>> / file: hydra-main.service.ts:182 / err:', err);
+                this.cacheManager.set('activeNodes', []);
             });
-        });
+    }
+
+    async getActiveNodeContainers() {
+        const activeNodes = (await this.cacheManager.get<Caching['activeNodes']>('activeNodes')) || [];
+        return activeNodes;
     }
 
     async cardanoQueryTip() {
@@ -245,7 +279,6 @@ export class HydraMainService implements OnModuleInit {
 
     async getAddressUtxo(address: string) {
         try {
-
             const cardanoCli = new CardanoCliJs({
                 cliPath: `docker exec cardano-node cardano-cli`,
                 dir: `/workspace`,
@@ -263,7 +296,6 @@ export class HydraMainService implements OnModuleInit {
                     { name: 'testnet-magic', value: '1' },
                     { name: 'output-json', value: '' },
                 ],
-    
             });
             const utxo = JSON.parse(Buffer.from(output).toString());
             return utxo as AddressUtxoDto;
@@ -352,7 +384,7 @@ export class HydraMainService implements OnModuleInit {
     async getListAccount() {
         const accounts = (await this.accountRepository.find()) as Array<Account & { utxo: any }>;
         for (const account of accounts) {
-            account.utxo = {}
+            account.utxo = {};
         }
         return accounts.map(account => new ResCardanoAccountDto(account));
     }
@@ -390,11 +422,11 @@ export class HydraMainService implements OnModuleInit {
                 cardanoAccount: true,
             },
         });
+        const activeNodes = await this.getActiveNodeContainers();
         return nodes.map(node => {
             // check node active
-            const isActive = this.activeNodes.find(container =>
-                container.Names.includes(`/hexcore-hydra-node-${node.id}`),
-            );
+            const isActive = activeNodes.find(item => item.hydraNodeId === node.id.toString());
+
             return new HydraDto(node, isActive ? 'ACTIVE' : 'INACTIVE');
         });
     }
@@ -562,7 +594,21 @@ export class HydraMainService implements OnModuleInit {
             .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
             .leftJoinAndSelect('hydraNodes.cardanoAccount', 'cardanoAccount')
             .getMany();
-        return parties;
+        const activeNodes = await this.getActiveNodeContainers();
+        return parties.map(party => {
+            const isActive =
+                party.hydraNodes.length &&
+                party.hydraNodes.every(hydraNode => {
+                    return activeNodes.find(
+                        item =>
+                            item.hydraPartyId === party.id.toString() && item.hydraNodeId === hydraNode.id.toString(),
+                    );
+                });
+            return {
+                ...party,
+                status: isActive ? 'ACTIVE' : 'INACTIVE',
+            };
+        });
     }
 
     async checkUtxoAccount(account: Account): Promise<boolean> {
@@ -716,7 +762,11 @@ export class HydraMainService implements OnModuleInit {
                     `1`,
                 ],
                 HostConfig: {
-                    NetworkMode: 'host',
+                    ...(this.CONSTANTS.enableNetworkHost
+                        ? {
+                              NetworkMode: 'host',
+                          }
+                        : {}),
                     Binds: [
                         `${this.CONSTANTS.hydraNodeFolder}:/data`,
                         `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
@@ -736,8 +786,8 @@ export class HydraMainService implements OnModuleInit {
                 name: nodeName,
                 // Create name Room/Hydra Party for node
                 Labels: {
-                    party_name: `party-${party.id.toString()}`,
-                    party_id: party.id.toString(),
+                    [this.CONSTANTS.hydraPartyLabel]: party.id.toString(),
+                    [this.CONSTANTS.hydraNodeLabel]: node.id.toString(),
                 },
             });
             // @ts-ignore
@@ -752,8 +802,8 @@ export class HydraMainService implements OnModuleInit {
             console.log(`Container ${nodeName} started`);
         }
         // active GameRoom
-        await this.createGameRoom(party);
-        party.status = 'ACTIVE';
+        // await this.createGameRoom(party);
+        // party.status = 'ACTIVE';
         await this.hydraPartyRepository.save(party);
 
         // check party active
@@ -782,14 +832,16 @@ export class HydraMainService implements OnModuleInit {
         }
     }
 
-    checkPartyActive(party: HydraParty) {
-        for (const node of party.hydraNodes) {
-            console.log('>>> / file: hydra-main.service.ts:607 / node:', node);
-
-            // check if the node is active
-            // if not, return false
-        }
-        return false;
+    async checkPartyActive(party: HydraParty) {
+        const activeNodes = await this.getActiveNodeContainers();
+        return (
+            party.hydraNodes.length &&
+            party.hydraNodes.every(node => {
+                return activeNodes.find(
+                    item => item.hydraPartyId === party.id.toString() && item.hydraNodeId === node.id.toString(),
+                );
+            })
+        );
     }
 
     async commitToHydraNode(commitHydraDto: CommitHydraDto) {
