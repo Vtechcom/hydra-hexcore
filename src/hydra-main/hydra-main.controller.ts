@@ -7,6 +7,7 @@ import {
     Param,
     Post,
     Query,
+    UseGuards,
     UseInterceptors,
 } from '@nestjs/common';
 import { HydraMainService } from './hydra-main.service';
@@ -21,10 +22,18 @@ import { QueryHydraDto } from './dto/query-hydra.dto';
 import { infinityPagination } from 'src/utils/infinity-pagination';
 import { InfinityPaginationResponseDto } from 'src/utils/dto/infinity-pagination-response.dto';
 import { HydraDto } from './dto/hydra.dto';
+import { AdminLoginDto } from './dto/admin-login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { HydraAdminService } from './hydra-admin.service';
+import { AdminAuthGuard } from 'src/auth/admin-auth.guard';
 
 @Controller('hydra-main')
 export class HydraMainController {
-    constructor(private hydraMainService: HydraMainService) {}
+    constructor(
+        private hydraMainService: HydraMainService,
+        private jwtService: JwtService,
+        private hydraAdminService: HydraAdminService,
+    ) {}
 
     @Get('request-node')
     requestHydraNode() {
@@ -36,6 +45,13 @@ export class HydraMainController {
         return this.hydraMainService.getCardanoNodeInfo();
     }
 
+    @Post('login')
+    async login(@Body() loginDto: AdminLoginDto) {
+        const user = await this.hydraAdminService.login(loginDto);
+        return user;
+    }
+
+    @UseGuards(AdminAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
     @Get('list-account')
     getListAccount() {

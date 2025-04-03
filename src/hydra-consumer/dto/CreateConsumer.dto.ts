@@ -9,9 +9,9 @@ export class CreateConsumerDto {
     @IsString()
     avatar?: string;
 
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
-    registrationTx: string;
+    registrationTx?: string;
 
     @IsNotEmpty()
     @IsString()

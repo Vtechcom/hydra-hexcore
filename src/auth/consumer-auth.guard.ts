@@ -1,11 +1,11 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { jwtConstants } from 'src/constants';
-import { JwtPayload } from 'src/hydra-game/interfaces/jwtPayload.type';
+import { ConsumerJwtPayload } from 'src/hydra-game/interfaces/jwtPayload.type';
 import { JwtHelper } from './jwt.helper';
 
 @Injectable()
-export class GameAuthGuard implements CanActivate {
+export class ConsumerAuthGuard implements CanActivate {
     constructor(private jwtService: JwtService) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -15,11 +15,11 @@ export class GameAuthGuard implements CanActivate {
             throw new UnauthorizedException();
         }
         try {
-            const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+            const payload = await this.jwtService.verifyAsync<ConsumerJwtPayload>(token, {
                 secret: jwtConstants.secret,
             });
             request['user'] = payload;
-        } catch {
+        } catch (error) {
             throw new UnauthorizedException();
         }
         return true;

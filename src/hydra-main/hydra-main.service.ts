@@ -92,8 +92,8 @@ export class HydraMainService implements OnModuleInit {
         private accountRepository: Repository<Account>,
         @InjectRepository(HydraParty)
         private hydraPartyRepository: Repository<HydraParty>,
-        @InjectRepository(GameRoom)
-        private gameRoomRepository: Repository<GameRoom>,
+        // @InjectRepository(GameRoom)
+        // private gameRoomRepository: Repository<GameRoom>,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {
         const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
@@ -431,6 +431,12 @@ export class HydraMainService implements OnModuleInit {
         });
     }
 
+    async getHydraNodeById(id: number) {
+        return this.hydraNodeRepository.findOne({
+            where: { id },
+        });
+    }
+
     async createHydraNode(body: CreateHydraNodeDto) {
         const cardanoAccount = await this.accountRepository.findOne({
             where: {
@@ -580,7 +586,7 @@ export class HydraMainService implements OnModuleInit {
         }
 
         // active GameRoom
-        await this.createGameRoom(newParty, false);
+        // await this.createGameRoom(newParty, false);
 
         return {
             ...newParty,
@@ -815,22 +821,22 @@ export class HydraMainService implements OnModuleInit {
         };
     }
 
-    async createGameRoom(partyObj: HydraParty, active_status = true) {
-        const item = await this.gameRoomRepository.findOne({
-            where: { party: { id: partyObj.id } },
-        });
-        if (item) {
-            item.status = active_status ? 'ACTIVE' : 'INACTIVE';
-            await this.gameRoomRepository.save(item);
-        } else {
-            const room = this.gameRoomRepository.create({
-                party: partyObj,
-                name: `Room ${partyObj.id}`,
-                status: active_status ? 'ACTIVE' : 'INACTIVE',
-            });
-            this.gameRoomRepository.save(room);
-        }
-    }
+    // async createGameRoom(partyObj: HydraParty, active_status = true) {
+    //     const item = await this.gameRoomRepository.findOne({
+    //         where: { party: { id: partyObj.id } },
+    //     });
+    //     if (item) {
+    //         item.status = active_status ? 'ACTIVE' : 'INACTIVE';
+    //         await this.gameRoomRepository.save(item);
+    //     } else {
+    //         const room = this.gameRoomRepository.create({
+    //             party: partyObj,
+    //             name: `Room ${partyObj.id}`,
+    //             status: active_status ? 'ACTIVE' : 'INACTIVE',
+    //         });
+    //         this.gameRoomRepository.save(room);
+    //     }
+    // }
 
     async checkPartyActive(party: HydraParty) {
         const activeNodes = await this.getActiveNodeContainers();

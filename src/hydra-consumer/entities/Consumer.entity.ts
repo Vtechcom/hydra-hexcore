@@ -1,4 +1,13 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Exclude } from 'class-transformer';
+export enum ConsumerStatus {
+    ACTIVE = 'ACTIVE',
+    INACTIVE = 'INACTIVE',
+    BLOCKED = 'BLOCKED',
+    REQUESTED = 'REQUESTED',
+    APPROVED = 'APPROVED',
+    REJECTED = 'REJECTED',
+}
 
 @Entity()
 export class Consumer {
@@ -25,6 +34,7 @@ export class Consumer {
     })
     apikey: string;
 
+    @Exclude()
     @Column({
         default: '',
     })
@@ -36,7 +46,9 @@ export class Consumer {
     createdAt: string;
 
     @Column({
-        default: 'ACTIVE',
+        type: 'enum',
+        enum: ConsumerStatus,
+        default: ConsumerStatus.REQUESTED,
     })
-    status: string;
+    status: ConsumerStatus;
 }

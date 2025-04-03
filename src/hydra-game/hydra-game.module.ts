@@ -17,13 +17,12 @@ import { EventGateway } from './event.gateway';
     imports: [
         TypeOrmModule.forFeature([HydraNode, Account, HydraParty, GameUser, GameRoom, GameRoomDetail]),
         JwtModule.register({
-            global: true,
             secret: jwtConstants.secret,
             signOptions: { expiresIn: '1 weeks' },
         }),
     ],
     providers: [HydraGameService, EventGateway],
     controllers: [HydraGameController],
-    exports: [EventGateway],
+    exports: [EventGateway, JwtModule],
 })
 export class HydraGameModule {}

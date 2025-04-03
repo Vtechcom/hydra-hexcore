@@ -1,27 +1,35 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { jwtConstants } from 'src/constants';
-import { JwtPayload } from 'src/hydra-game/interfaces/jwtPayload.type';
 import { JwtHelper } from './jwt.helper';
+import { AdminJwtPayload } from 'src/hydra-game/interfaces/jwtPayload.type';
 
 @Injectable()
-export class GameAuthGuard implements CanActivate {
+export class AdminAuthGuard implements CanActivate {
     constructor(private jwtService: JwtService) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest();
         const token = JwtHelper.extractTokenFromHeader(request.headers);
+
         if (!token) {
             throw new UnauthorizedException();
         }
         try {
-            const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+            const payload = await this.jwtService.verifyAsync<AdminJwtPayload>(token, {
                 secret: jwtConstants.secret,
             });
             request['user'] = payload;
-        } catch {
+        } catch (error) {
             throw new UnauthorizedException();
         }
         return true;
+    }
+
+    handleRequest(err, user, info) {
+        if (err || !user) {
+            throw err || new UnauthorizedException();
+        }
+        return user;
     }
 }
