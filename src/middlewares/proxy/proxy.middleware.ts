@@ -1,6 +1,7 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import configuration from 'src/config/configuration';
 import { HydraConsumerService } from 'src/hydra-consumer/hydra-consumer.service';
 
 @Injectable()
@@ -9,20 +10,24 @@ export class ProxyMiddleware implements NestMiddleware {
 
     async use(req: Request, res: Response, next: NextFunction) {
         const host = req.headers.host;
-        const isSSL = req.headers['x-forwarded-proto'] === 'https';
-
+        const protocol = getProtocol(req);
         // Check if host matches subdomain pattern <apikey>.hydranode.hdev99.io.vn
-        const subdomainMatch = host?.match(/^([a-z0-9-]+)\.hydranode\.io\.vn$/);
+        const regex = new RegExp(configuration().proxy.matchPattern);
+        const subdomainMatch = regex.test(host);
         if (subdomainMatch) {
-            const apikey = subdomainMatch[1];
+            const apikey = host.replace(regex, '$1');
             const targetHost = await this.hydraConsumerService.getUrlByConsumerKey(apikey);
-            const targetUrl = isSSL ? `wss://${targetHost}` : `ws://${targetHost}`;
-            console.log('>>> targetUrl:', targetUrl);
+            const targetUrl = `${protocol}://${targetHost}`;
             if (targetUrl) {
                 const proxy = createProxyMiddleware({
                     target: targetUrl,
                     changeOrigin: true,
-                    ws: true, // Enable WebSocket support
+                    ws: true,
+                    secure: false,
+                    logger: console,
+                    pathRewrite: (path, req: any) => {
+                        return req.originalUrl; 
+                    },
                 });
                 return proxy(req, res, next);
             } else {
@@ -33,4 +38,10 @@ export class ProxyMiddleware implements NestMiddleware {
             next();
         }
     }
+}
+
+function getProtocol(req: Request) {
+    const isWebSocket = req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket' &&
+                        req.headers.connection && req.headers.connection.toLowerCase().includes('upgrade');
+    return isWebSocket ? 'ws' : 'http';
 }

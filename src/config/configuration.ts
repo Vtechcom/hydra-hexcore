@@ -29,4 +29,8 @@ export default () => ({
         url: process.env.REDIS_URL || 'redis://localhost:6379',
         password: process.env.REDIS_PASSWORD || '',
     },
+    proxy: {
+        matchPattern: process.env.NEST_PROXY_MATCH_PATTERN || '^([a-z0-9-]+)\.hydranode\.io\.vn$',
+        proxyDomain: process.env.NEST_PROXY_DOMAIN || 'hydranode.io.vn',
+    },
 });
