@@ -1,5 +1,7 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { ConsumerKeyMapper } from './ConsumerKeyMapper.entity';
+
 export enum ConsumerStatus {
     ACTIVE = 'ACTIVE',
     INACTIVE = 'INACTIVE',
@@ -33,6 +35,9 @@ export class Consumer {
         default: '',
     })
     apikey: string;
+
+    @OneToMany(() => ConsumerKeyMapper, mapper => mapper.consumer)
+    mappers: ConsumerKeyMapper[];
 
     @Exclude()
     @Column({

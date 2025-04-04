@@ -88,11 +88,12 @@ export class HydraConsumerService implements OnModuleInit {
             consumerKey: generateConsumerKey(),
             url: url,
             isActive: true,
+            hydraNode,
         });
         return this.mapperRepository.save(mapper);
     }
 
-    async removeConsumerNode(removeConsumerNodeDto: RemoveConsumerNodeDto) {
+    async removeSharedNode(removeConsumerNodeDto: RemoveConsumerNodeDto) {
         const mapper = await this.mapperRepository.findOne({
             where: { id: removeConsumerNodeDto.mapperId },
         });
@@ -103,6 +104,32 @@ export class HydraConsumerService implements OnModuleInit {
         mapper.url = '';
         await this.mapperRepository.save(mapper);
         return mapper;
+    }
+
+    async getConsumerInfoById(id: number) {
+        const consumer = await this.consumerRepository
+            .createQueryBuilder('consumer')
+            .leftJoinAndSelect('consumer.mappers', 'mappers')
+            .leftJoinAndSelect('mappers.hydraNode', 'hydraNode')
+            .where('consumer.id = :id', { id })
+            .getOne();
+        if (!consumer) {
+            throw new HttpException('Consumer not found', HttpStatus.NOT_FOUND);
+        }
+        // check nodes is online or not
+        const activeNodes = await this.hydraMainService.getActiveNodeContainers();
+
+        const mappers = consumer.mappers.map(mapper => {
+            const node = activeNodes.find(node => node.hydraNodeId === mapper.hydraNode.id.toString());
+            return {
+                ...mapper,
+                isOnline: node ? true : false,
+            };
+        });
+        return {
+            ...consumer,
+            mappers,
+        };
     }
 
     async getConsumerInfo(id: number) {

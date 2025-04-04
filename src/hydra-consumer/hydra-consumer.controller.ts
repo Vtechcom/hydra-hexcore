@@ -9,6 +9,7 @@ import {
     UseGuards,
     Req,
     Put,
+    Param,
 } from '@nestjs/common';
 import { HydraConsumerService } from './hydra-consumer.service';
 import { CreateConsumerDto } from './dto/CreateConsumer.dto';
@@ -36,54 +37,63 @@ export class HydraConsumerController {
 
     @UseGuards(AdminAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
-    @Get('list-consumers')
+    @Get('admin/list-consumers')
     listConsumers(@Query() query: QueryConsumersDto) {
         return this.hydraConsumerService.listConsumers(query);
     }
 
     @UseGuards(AdminAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
-    @Put('update-consumer')
+    @Put('admin/update-consumer')
     updateConsumer(@Body() updateConsumerDto: UpdateConsumerDto) {
         return this.hydraConsumerService.updateConsumer(updateConsumerDto.id, updateConsumerDto);
     }
 
     @UseGuards(AdminAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
-    @Post('share-consumer-node')
+    @Post('admin/share-consumer-node')
     shareConsumerNode(@Body() shareConsumerNodeDto: ShareConsumerNodeDto) {
         return this.hydraConsumerService.shareConsumerNode(shareConsumerNodeDto);
     }
 
     @UseGuards(AdminAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
-    @Post('remove-consumer-node')
-    removeConsumerNode(@Body() removeConsumerNodeDto: RemoveConsumerNodeDto) {
-        return this.hydraConsumerService.removeConsumerNode(removeConsumerNodeDto);
+    @Post('admin/remove-shared-node')
+    removeSharedNode(@Body() removeConsumerNodeDto: RemoveConsumerNodeDto) {
+        return this.hydraConsumerService.removeSharedNode(removeConsumerNodeDto);
     }
+
+    @UseGuards(AdminAuthGuard)
+    @UseInterceptors(ClassSerializerInterceptor)
+    @Get('admin/consumer/:id')
+    getConsumerInfoById(@Param('id') id: string) {
+        return this.hydraConsumerService.getConsumerInfoById(+id);
+    }
+
+    // Consumer
 
     @UseGuards(ConsumerAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
-    @Get('info')
+    @Get('consumer/info')
     getConsumerInfo(@Req() req: any) {
         return this.hydraConsumerService.getConsumerInfo(req.user.id);
     }
 
     @UseGuards(ConsumerAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
-    @Get('authorization')
+    @Get('consumer/authorization')
     authorization(@Req() req: any) {
         return this.hydraConsumerService.authorization(req.user);
     }
 
-    @Post('login')
+    @Post('consumer/login')
     login(@Body() loginDto: ConsumerLoginDto) {
         return this.hydraConsumerService.login(loginDto);
     }
 
     @UseGuards(ConsumerAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
-    @Get('owned-nodes')
+    @Get('consumer/owned-nodes')
     getOwnedNodes(@Req() req: any) {
         return this.hydraConsumerService.getOwnedNodes(req.user.id);
     }
