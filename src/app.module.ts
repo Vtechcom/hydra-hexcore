@@ -12,7 +12,6 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { createKeyv, Keyv } from '@keyv/redis';
 import { CacheableMemory } from 'cacheable';
 import { HydraConsumerModule } from './hydra-consumer/hydra-consumer.module';
-import { ProxyMiddleware } from './middlewares/proxy/proxy.middleware';
 @Module({
     imports: [
         ConfigModule.forRoot({
@@ -52,8 +51,4 @@ import { ProxyMiddleware } from './middlewares/proxy/proxy.middleware';
     controllers: [AppController],
     providers: [AppService],
 })
-export class AppModule {
-    configure(consumer: MiddlewareConsumer) {
-        consumer.apply(ProxyMiddleware).forRoutes('*');
-    }
-}
+export class AppModule {}
