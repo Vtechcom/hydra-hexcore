@@ -464,7 +464,7 @@ export class HydraMainService implements OnModuleInit {
 
             // Run the container
             const container = await this.docker.createContainer({
-                Image: 'ghcr.io/input-output-hk/hydra-node:latest',
+                Image: this.CONSTANTS.hydraNodeImage,
                 Cmd: ['gen-hydra-key', '--output-file', `${containerVolume}/_hydra-internal-key`],
                 HostConfig: {
                     Binds: [`${this.CONSTANTS.hydraNodeFolder}:${containerVolume}`], // Bind mount
