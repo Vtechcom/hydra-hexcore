@@ -16,6 +16,7 @@ import { HydraGameService } from './hydra-game.service';
 import { GameUser } from './entities/GameUser.entity';
 
 enum SocketEvent {
+    KEEP_ALIVE = 'keep_alive',
     JOIN_ROOM = 'join_room',
     LEAVE_ROOM = 'leave_room',
     TYPING = 'typing',
@@ -73,6 +74,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 this.userIdMap.set(userId, client.id);
                 const unicastRoom = this.joinRoomUnicast(userId, client);
                 client.emit(SocketEvent.CONNECTED, { unicastRoom });
+                console.log('[Total connected clients]', this.userIdMap.size);
             } catch (error) {
                 console.error('[Websocket]: error ', error);
                 client.disconnect();
@@ -157,16 +159,22 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     @SubscribeMessage(SocketEvent.LEAVE_ROOM)
-    async handleLeaveRoomGame(@MessageBody() msgBody: { roomId?: number }, @ConnectedSocket() client: Socket) {
-        if (!msgBody.roomId) {
-            return client.emit(SocketEvent.MESSAGE, { data: null, message: `Require roomId` });
-        }
+    async handleLeaveRoomGame(@ConnectedSocket() client: Socket) {
+        // if (!msgBody.roomId) {
+        //     return client.emit(SocketEvent.MESSAGE, { data: null, message: `Require roomId` });
+        // }
 
         const user = await this.getUserFromSocket(client);
         if (!user) {
             return client.emit(SocketEvent.MESSAGE, 'Not recognize user');
         }
         const rs = await this.hydraGameService.removeUserInRoom(user);
-        return client.emit(SocketEvent.MESSAGE, { data: rs, message: `Leave room ${msgBody.roomId}` });
+        return client.emit(SocketEvent.LEAVE_ROOM, { data: rs, message: `Leave room` });
+    }
+
+    @SubscribeMessage(SocketEvent.KEEP_ALIVE)
+    async handleKeepAlive(@ConnectedSocket() client: Socket) {
+        console.log('[Keep alive]', client.id);
+        client.emit(SocketEvent.KEEP_ALIVE, { status: 'success' });
     }
 }
