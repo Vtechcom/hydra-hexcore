@@ -850,6 +850,25 @@ export class HydraMainService implements OnModuleInit {
         );
     }
 
+    async checkPartyActiveById(partyId: HydraParty['id']) {
+        const activeNodes = await this.getActiveNodeContainers();
+        const party = await this.hydraPartyRepository
+            .createQueryBuilder('party')
+            .where('party.id = :id', { id: partyId })
+            .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
+            .getOne();
+        if (!party) return false
+        console.log(party);
+        return (
+            party.hydraNodes.length &&
+            party.hydraNodes.every(node => {
+                return activeNodes.find(
+                    item => item.hydraPartyId === party.id.toString() && item.hydraNodeId === node.id.toString(),
+                );
+            })
+        );
+    }
+
     async commitToHydraNode(commitHydraDto: CommitHydraDto) {
         // find the party and node
         const partyId = commitHydraDto.partyId;

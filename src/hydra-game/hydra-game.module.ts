@@ -12,6 +12,7 @@ import { GameRoomDetail } from './entities/RoomDetail.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { jwtConstants } from 'src/constants';
 import { EventGateway } from './event.gateway';
+import { HydraMainService } from 'src/hydra-main/hydra-main.service';
 
 @Module({
     imports: [
@@ -21,7 +22,7 @@ import { EventGateway } from './event.gateway';
             signOptions: { expiresIn: '1 weeks' },
         }),
     ],
-    providers: [HydraGameService, EventGateway],
+    providers: [HydraGameService, EventGateway, HydraMainService],
     controllers: [HydraGameController],
     exports: [EventGateway, JwtModule],
 })
