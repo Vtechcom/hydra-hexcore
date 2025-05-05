@@ -125,6 +125,13 @@ export class HydraMainController {
     }
 
     @UseInterceptors(ClassSerializerInterceptor)
+    @Post('deactive-party')
+    deactiveHydraParty(@Body() activePartyDto: ReqActivePartyDto) {
+        // res.status(HttpStatus.OK).json(this.hydraMainService.createAccount(createAccountDto));
+        return this.hydraMainService.deactiveHydraParty(activePartyDto);
+    }
+
+    @UseInterceptors(ClassSerializerInterceptor)
     @Get('utxo/:address')
     getListUtxo(@Param('address') address: string) {
         return this.hydraMainService.getAddressUtxo(address);

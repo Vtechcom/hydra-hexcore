@@ -63,7 +63,7 @@ export class HydraMainService implements OnModuleInit {
         hydraNodeFolder: process.env.NEST_HYDRA_NODE_FOLDER || 'D:/Projects/Vtechcom/cardano-node/hydra/preprod',
         hydraNodeScriptTxId: process.env.NEST_HYDRA_NODE_SCRIPT_TX_ID || '',
         hydraNodeNetworkId: process.env.NEST_HYDRA_NODE_NETWORK_ID || '1',
-        cardanoAccountMinLovelace: process.env.ACCOUNT_MINT_LOVELACE || 50000000,
+        cardanoAccountMinLovelace: process.env.ACCOUNT_MINT_LOVELACE || 50000000, // 50 ADA
         enableNetworkHost: process.env.NEST_DOCKER_ENABLE_NETWORK_HOST === 'true',
 
         // Dockerize
@@ -681,7 +681,7 @@ export class HydraMainService implements OnModuleInit {
         // create docker container for each node
         for (const node of party.hydraNodes) {
             const peerNodes = party.hydraNodes.filter(peerNode => peerNode.id !== node.id);
-            const nodeName = `hexcore-hydra-node-${node.id}`;
+            const nodeName = this.getDockerContainerName(node);
 
             const skeyFilePath = `${partyDirPath}/${nodeName}.sk`;
             const vkeyFilePath = `${partyDirPath}/${nodeName}.vk`;
@@ -719,7 +719,7 @@ export class HydraMainService implements OnModuleInit {
 
             const peerNodeParams = peerNodes
                 .map(peerNode => {
-                    const nodeName = `hexcore-hydra-node-${peerNode.id}`;
+                    const nodeName = this.getDockerContainerName(peerNode);
                     return [
                         '--peer',
                         `127.0.0.1:${peerNode.port + 1000}`,
@@ -779,9 +779,9 @@ export class HydraMainService implements OnModuleInit {
                         `${this.CONSTANTS.hydraNodeFolder}:/data`,
                         `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
                     ], // Bind mount
-                    RestartPolicy: {
-                        Name: 'always', // Equivalent to `restart: always`
-                    },
+                    // RestartPolicy: {
+                    //     Name: 'always', // Equivalent to `restart: always`
+                    // },
                     PortBindings: {
                         [`${node.port}/tcp`]: [{ HostPort: `${node.port}` }], // Map api port
                         [`${node.port + 1000}/tcp`]: [{ HostPort: `${node.port + 1000}` }], // Map port
@@ -813,6 +813,51 @@ export class HydraMainService implements OnModuleInit {
         // await this.createGameRoom(party);
         // party.status = 'ACTIVE';
         await this.hydraPartyRepository.save(party);
+
+        await Promise.resolve(() => setTimeout(() => {}, 1000));
+        // check party active
+        const status = await this.checkPartyActive(party);
+
+        return {
+            ...party,
+            status: status ? 'ACTIVE' : 'INACTIVE',
+        };
+    }
+
+    async deactiveHydraParty(activePartyDto: ReqActivePartyDto): Promise<ResActivePartyDto> {
+        const partyId = activePartyDto.id;
+        const party = await this.hydraPartyRepository
+            .createQueryBuilder('party')
+            .where('party.id = :id', { id: partyId })
+            .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
+            .leftJoinAndSelect('hydraNodes.cardanoAccount', 'cardanoAccount')
+            .getOne();
+
+        if (!party) {
+            throw new BadRequestException('Invalid Party Id');
+        }
+        // if (party.status === 'INACTIVE') {
+        //     throw new BadRequestException('Party is already inactive');
+        // }
+        for (const node of party.hydraNodes) {
+            const nodeName = this.getDockerContainerName(node);
+            try {
+                const container = await this.docker.getContainer(nodeName);
+                if (container) {
+                    if ((await container.inspect()).State.Running) {
+                        await container.stop();
+                        console.log(`[deactiveHydraParty]: Container ${nodeName} stopped`);
+                    }
+                    await container.remove();
+                    console.log(`[deactiveHydraParty]: Container ${nodeName} removed`);
+                }
+            } catch (error: any) {
+                console.error(`Error while removing container: ${nodeName}`, error.message);
+            }
+        }
+        await Promise.resolve(() => setTimeout(() => {}, 1000));
+        await this.hydraPartyRepository.save(party);
+        await this.updateHydraContainerStatus();
 
         // check party active
         const status = await this.checkPartyActive(party);
@@ -852,6 +897,11 @@ export class HydraMainService implements OnModuleInit {
         );
     }
 
+    getDockerContainerName(hydraNode: HydraNode) {
+        return `hexcore-hydra-node-${hydraNode.id}`;
+    }
+
+    // TODO: Helper function for hydra-bridge, remove it later
     async commitToHydraNode(commitHydraDto: CommitHydraDto) {
         // find the party and node
         const partyId = commitHydraDto.partyId;
