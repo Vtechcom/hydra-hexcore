@@ -17,6 +17,7 @@ import { UserLoginDto } from './dto/user-login.dto';
 import { JwtPayload } from './interfaces/jwtPayload.type';
 import { ResUserInfoDto } from './dto/response/user-info.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { HydraMainService } from 'src/hydra-main/hydra-main.service';
 
 @Injectable()
 export class HydraGameService implements OnModuleInit {
@@ -34,6 +35,8 @@ export class HydraGameService implements OnModuleInit {
         @InjectRepository(GameRoomDetail)
         private gameRoomDetailRepository: Repository<GameRoomDetail>,
         private jwtService: JwtService,
+
+        private hydraMainService: HydraMainService,
     ) {
         const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
         this.docker = new Docker({ socketPath: DOCKER_SOCKET });
@@ -114,7 +117,15 @@ export class HydraGameService implements OnModuleInit {
         queryBuilder.skip((page - 1) * limit).take(limit);
 
         const rooms = await queryBuilder.getMany();
-        return rooms;
+        const checkPartyActiveQueue = rooms.map(room => this.hydraMainService.checkPartyActiveById(room.party.id))
+        const results = await Promise.allSettled(checkPartyActiveQueue)
+        return rooms.map((room, idx) => {
+            const isActive = results[idx].status === 'fulfilled' && results[idx].value == true
+            return {
+                ...room,
+                status: isActive ? 'ACTIVE' : 'INACTIVE'
+            }
+        });
     }
 
     async getRoom(id: number): Promise<GameRoom> {

@@ -437,6 +437,25 @@ export class HydraMainService implements OnModuleInit {
         });
     }
 
+    async getHydraNodeDetail(id: number) {
+        const node = await this.hydraNodeRepository.findOne({
+            where: { id },
+            relations: {
+                cardanoAccount: true,
+            },
+        });
+        const activeNodes = await this.getActiveNodeContainers();
+        if (!node) {
+            throw new BadRequestException('Invalid Hydra Node Id');
+        }
+        const containerNode = activeNodes.find(item => item.hydraNodeId === node.id.toString());
+        return {
+            ...node,
+            status: containerNode ? 'ACTIVE' : 'INACTIVE',
+            container: containerNode?.container,
+        };
+    }
+
     async createHydraNode(body: CreateHydraNodeDto) {
         const cardanoAccount = await this.accountRepository.findOne({
             where: {
@@ -897,11 +916,29 @@ export class HydraMainService implements OnModuleInit {
         );
     }
 
+    async checkPartyActiveById(partyId: HydraParty['id']) {
+        const activeNodes = await this.getActiveNodeContainers();
+        const party = await this.hydraPartyRepository
+            .createQueryBuilder('party')
+            .where('party.id = :id', { id: partyId })
+            .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
+            .getOne();
+        if (!party) return false;
+        console.log(party);
+        return (
+            party.hydraNodes.length &&
+            party.hydraNodes.every(node => {
+                return activeNodes.find(
+                    item => item.hydraPartyId === party.id.toString() && item.hydraNodeId === node.id.toString(),
+                );
+            })
+        );
+    }
+
     getDockerContainerName(hydraNode: HydraNode) {
         return `hexcore-hydra-node-${hydraNode.id}`;
     }
 
-    // TODO: Helper function for hydra-bridge, remove it later
     async commitToHydraNode(commitHydraDto: CommitHydraDto) {
         // find the party and node
         const partyId = commitHydraDto.partyId;
