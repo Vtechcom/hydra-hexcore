@@ -740,12 +740,19 @@ export class HydraMainService implements OnModuleInit {
                 console.error(`Error while removing container: ${nodeName}`, error.message);
             }
 
+            /**
+             * NOTE: 
+             * - Cập nhật command run node cho Hydra v0.21.0
+             * - Chuyển sang chế độ network custom brigde:
+             * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network` 
+             * - Thêm advertise param
+             */
             const peerNodeParams = peerNodes
                 .map(peerNode => {
                     const nodeName = this.getDockerContainerName(peerNode);
                     return [
                         '--peer',
-                        `127.0.0.1:${peerNode.port + 1000}`,
+                        `${nodeName}:${peerNode.port + 1000}`,
                         `--hydra-verification-key`,
                         `/data/party-${party.id}/${nodeName}.vk`,
                         `--cardano-verification-key`,
@@ -753,74 +760,50 @@ export class HydraMainService implements OnModuleInit {
                     ];
                 })
                 .flat();
-            const container = await this.docker.createContainer({
-                Image: this.CONSTANTS.hydraNodeImage,
-                Cmd: [
-                    '--node-id',
-                    `${nodeName}`,
-
-                    `--persistence-dir`,
-                    `/data/${resolvePersistenceDir(party.id, nodeName)}`,
-
-                    `--api-host`,
-                    `0.0.0.0`,
-                    `--api-port`,
-                    `${node.port}`,
-
-                    `--listen`,
-                    `0.0.0.0:${node.port + 1000}`,
-
-                    ...peerNodeParams,
-
-                    `--hydra-signing-key`,
-                    `/data/party-${party.id}/${nodeName}.sk`,
-                    `--cardano-signing-key`,
-                    `/data/party-${party.id}/${nodeName}.cardano.sk`,
-
-                    `--ledger-protocol-parameters`,
-                    `/data/party-${party.id}/protocol-parameters.json`,
-
-                    `--hydra-scripts-tx-id`,
-                    `${this.CONSTANTS.hydraNodeScriptTxId}`,
-
-                    `--node-socket`,
-                    `/cardano-node/node.socket`,
-
-                    `--contestation-period`,
-                    `60`,
-
-                    `--testnet-magic`,
-                    `${this.CONSTANTS.hydraNodeNetworkId}`,
-                ],
-                HostConfig: {
-                    ...(this.CONSTANTS.enableNetworkHost
-                        ? {
-                              NetworkMode: 'host',
-                          }
-                        : {}),
-                    Binds: [
-                        `${this.CONSTANTS.hydraNodeFolder}:/data`,
-                        `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
-                    ], // Bind mount
-                    // RestartPolicy: {
-                    //     Name: 'always', // Equivalent to `restart: always`
-                    // },
-                    PortBindings: {
-                        [`${node.port}/tcp`]: [{ HostPort: `${node.port}` }], // Map api port
-                        [`${node.port + 1000}/tcp`]: [{ HostPort: `${node.port + 1000}` }], // Map port
+                const container = await this.docker.createContainer({
+                    Image: this.CONSTANTS.hydraNodeImage,
+                    Cmd: [
+                        '--node-id', `${nodeName}`,
+                        '--persistence-dir', `/data/${resolvePersistenceDir(party.id, nodeName)}`,
+                        '--api-host', '0.0.0.0',
+                        '--api-port', `${node.port}`,
+                        '--listen', `0.0.0.0:${node.port + 1000}`,
+                        '--advertise', `${nodeName}:${node.port + 1000}`, 
+                        ...peerNodeParams,
+                        '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
+                        '--cardano-signing-key', `/data/party-${party.id}/${nodeName}.cardano.sk`,
+                        '--ledger-protocol-parameters', `/data/party-${party.id}/protocol-parameters.json`,
+                        '--hydra-scripts-tx-id', `${this.CONSTANTS.hydraNodeScriptTxId}`,
+                        '--node-socket', `/cardano-node/node.socket`,
+                        '--contestation-period', '60',
+                        '--deposit-deadline', '60',
+                        '--testnet-magic', `${this.CONSTANTS.hydraNodeNetworkId}`,
+                    ],
+                    HostConfig: {
+                        NetworkMode: 'hydra-network',
+                        Binds: [
+                            `${this.CONSTANTS.hydraNodeFolder}:/data`,
+                            `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
+                        ],
+                        PortBindings: {
+                            [`${node.port}/tcp`]: [{ HostPort: `${node.port}` }],
+                            [`${node.port + 1000}/tcp`]: [{ HostPort: `${node.port + 1000}` }],
+                        },
                     },
-                },
-                ExposedPorts: {
-                    [`${node.port}/tcp`]: {},
-                    [`${node.port + 1000}/tcp`]: {},
-                },
-                name: nodeName,
-                // Create name Room/Hydra Party for node
-                Labels: {
-                    [this.CONSTANTS.hydraPartyLabel]: party.id.toString(),
-                    [this.CONSTANTS.hydraNodeLabel]: node.id.toString(),
-                },
-            });
+                    ExposedPorts: {
+                        [`${node.port}/tcp`]: {},
+                        [`${node.port + 1000}/tcp`]: {},
+                    },
+                    name: nodeName,
+                    Labels: {
+                        [this.CONSTANTS.hydraPartyLabel]: party.id.toString(),
+                        [this.CONSTANTS.hydraNodeLabel]: node.id.toString(),
+                    },
+                    Env: [
+                        'ETCD_AUTO_COMPACTION_MODE=periodic',
+                        'ETCD_AUTO_COMPACTION_RETENTION=168h'
+                    ]
+                });
             // @ts-ignore
             node.container = {
                 id: container.id,
