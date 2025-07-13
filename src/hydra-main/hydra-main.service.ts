@@ -275,7 +275,7 @@ export class HydraMainService implements OnModuleInit {
             const data = JSON.parse(this.cleanJSON(output));
             return data as Record<string, any>;
         } catch (err) {
-            console.log(`[Error parse json] [${output}] `, err);
+            console.log(`[Error parse json] [ ${output} ] `, err);
             return {};
         }
     }
@@ -363,25 +363,26 @@ export class HydraMainService implements OnModuleInit {
         }
     }
 
-    cleanJSON(jsonString: string) {
-        const trimFirstRegex = /^[^[{]*\{/;
-        return (
-            jsonString
-                .replace(trimFirstRegex, '{')
-                // Remove invisible control characters and unused code points
-                .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '')
-                // Replace special quotation marks with standard ones
-                .replace(/[\u2018\u2019]/g, "'")
-                .replace(/[\u2018\u2019]/g, "'")
-                .replace(/[\u201C\u201D]/g, '"')
-                // Replace other common problematic characters
-                .replace(/[\u2013\u2014]/g, '-') // Em and en dashes
-                .replace(/\u00A0/g, ' ') // Non-breaking space
-                .replace(/\u2026/g, '...')
-                .replace(/^\uFFFD/, '') // Remove replacement character at start
-                .replace(/[^\x20-\x7E]/g, '') // Remove any other non-printable characters
-                .trim()
-        ); // Ellipsis
+    cleanJSON(_jsonString: string) {
+        let jsonString = _jsonString
+            .replace(/^[\s\S]*?{/, "{")
+            .replace(/^[^{]*\{\{/, '{') // Replace double {{
+            .replace(/\}\}[^}]*$/, '}') // Replace double }} at end
+            .replace(/^\uFFFD/, '') // remove replacement character at start
+            .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '') // control characters
+            .replace(/[\u2018\u2019]/g, "'")
+            .replace(/[\u201C\u201D]/g, '"')
+            .replace(/[\u2013\u2014]/g, '-')
+            .replace(/\u00A0/g, ' ')
+            .replace(/\u2026/g, '...')
+            .replace(/^\uFFFD/, '')
+            .replace(/[^\x20-\x7E]/g, '') // non-printable
+            .trim()
+        if (!jsonString.startsWith('{')) {
+            jsonString = _jsonString.slice(1, jsonString.length)
+        }
+        console.log(jsonString)
+        return jsonString
     }
 
     async getListAccount() {
@@ -642,7 +643,7 @@ export class HydraMainService implements OnModuleInit {
     async checkUtxoAccount(account: Account): Promise<boolean> {
         const a_utxo = await this.cardanoCliQueryUtxo(account.pointerAddress);
         const totalLovelace = Object.values(a_utxo).reduce((sum, item) => sum + item.value.lovelace, 0);
-
+        console.log(`[${account.pointerAddress}]:[${totalLovelace} lovelace]`)
         return totalLovelace >= this.CONSTANTS.cardanoAccountMinLovelace ? true : false;
     }
 
@@ -740,9 +741,18 @@ export class HydraMainService implements OnModuleInit {
                 console.error(`Error while removing container: ${nodeName}`, error.message);
             }
 
+            const cleanArg = (str: string | number) =>
+                String(str).replace(/[^\x20-\x7E]/g, '').trim();
             /**
              * NOTE: 
              * - Cập nhật command run node cho Hydra v0.21.0
+             * - Chuyển sang chế độ network custom brigde:
+             * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network` 
+             * - Thêm advertise param
+             */
+            /**
+             * NOTE: 
+             * - Cập nhật command run node cho Hydra v0.22.2
              * - Chuyển sang chế độ network custom brigde:
              * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network` 
              * - Thêm advertise param
@@ -764,20 +774,22 @@ export class HydraMainService implements OnModuleInit {
                     Image: this.CONSTANTS.hydraNodeImage,
                     Cmd: [
                         '--node-id', `${nodeName}`,
+                        '--listen', `0.0.0.0:${node.port + 1000}`,
+                        '--advertise', `${nodeName}:${node.port + 1000}`, 
+                        '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
                         '--persistence-dir', `/data/${resolvePersistenceDir(party.id, nodeName)}`,
                         '--api-host', '0.0.0.0',
                         '--api-port', `${node.port}`,
-                        '--listen', `0.0.0.0:${node.port + 1000}`,
-                        '--advertise', `${nodeName}:${node.port + 1000}`, 
                         ...peerNodeParams,
-                        '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
                         '--cardano-signing-key', `/data/party-${party.id}/${nodeName}.cardano.sk`,
-                        '--ledger-protocol-parameters', `/data/party-${party.id}/protocol-parameters.json`,
                         '--hydra-scripts-tx-id', `${this.CONSTANTS.hydraNodeScriptTxId}`,
-                        '--node-socket', `/cardano-node/node.socket`,
-                        '--contestation-period', '60',
-                        '--deposit-deadline', '60',
+
+                        '--deposit-period', `20s`,
+                        '--contestation-period', `15s`,
+                        
                         '--testnet-magic', `${this.CONSTANTS.hydraNodeNetworkId}`,
+                        '--node-socket', `/cardano-node/node.socket`,
+                        '--ledger-protocol-parameters', `/data/party-${party.id}/protocol-parameters.json`,
                     ],
                     HostConfig: {
                         NetworkMode: 'hydra-network',
@@ -814,7 +826,7 @@ export class HydraMainService implements OnModuleInit {
                 args: (await container.inspect()).Args,
                 image: (await container.inspect()).Config.Image,
             };
-
+            console.log('container', (await container.inspect()).Args)
             await container.start();
             console.log(`Container ${nodeName} started`);
         }
