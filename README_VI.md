@@ -1,35 +1,35 @@
 # Hydra HexCore
 
-Hydra HexCore is a backend service built with NestJS for managing and interacting with Hydra Head - a layer 2 scaling solution for the Cardano blockchain. The application provides APIs for managing Hydra nodes, processing transactions, and managing multi-party operations on Cardano.
+Hydra HexCore là một backend service được xây dựng với NestJS để quản lý và tương tác với Hydra Head - một giải pháp layer 2 scaling cho blockchain Cardano. Ứng dụng cung cấp APIs để quản lý Hydra nodes, xử lý transactions, và quản lý multi-party gaming trên Cardano.
 
-## 🚀 Key Features
+## 🚀 Tính năng chính
 
-- **Hydra Node Management**: Create and manage Hydra nodes
-- **Multi-Party Support**: Support for creating and managing participating parties in Hydra Head
-- **Transaction Processing**: Process and submit transactions on the Hydra layer
-- **Docker Integration**: Manage Cardano and Hydra containers
-- **Database Management**: Data storage with MySQL/SQLite
-- **Caching**: Redis caching for performance optimization
+- **Hydra Node Management**: Tạo và quản lý các Hydra nodes
+- **Multi-Party Support**: Hỗ trợ tạo và quản lý các bên tham gia (parties) trong Hydra Head
+- **Transaction Processing**: Xử lý và submit transactions trên Hydra layer
+- **Docker Integration**: Quản lý Cardano và Hydra containers
+- **Database Management**: Lưu trữ dữ liệu với MySQL/SQLite
+- **Caching**: Redis caching cho performance optimization
 - **Authentication**: JWT-based authentication system
 
-## 🏗️ Architecture
+## 🏗️ Kiến trúc
 
-The application is divided into main modules:
+Ứng dụng được chia thành các modules chính:
 
 - **HydraMainModule**: Core Hydra management functionality
 - **ShellModule**: Shell command execution utilities
-- **AuthModule**: Authentication and authorization
+- **AuthModule**: Authentication và authorization
 
-## 📋 System Requirements
+## 📋 Yêu cầu hệ thống
 
 - Node.js 20+
 - Docker & Docker Compose
-- MySQL 8.0+ or SQLite
+- MySQL 8.0+ hoặc SQLite
 - Redis (optional, for caching)
 - Cardano Node
 - Hydra Node binaries
 
-## 🛠️ Installation
+## 🛠️ Cài đặt
 
 ### 1. Clone repository
 
@@ -38,19 +38,19 @@ git clone <repository-url>
 cd hydra-hexcore
 ```
 
-### 2. Install dependencies
+### 2. Cài đặt dependencies
 
 ```bash
-# Using pnpm (recommended)
+# Sử dụng pnpm (recommended)
 pnpm install
 
-# Or npm
+# Hoặc npm
 npm install
 ```
 
-### 3. Environment configuration
+### 3. Cấu hình environment
 
-Create a `.env` file and configure environment variables:
+Tạo file `.env` và cấu hình các biến môi trường:
 
 ```env
 # Server Configuration
@@ -85,13 +85,13 @@ NEST_DOCKER_SOCKET_PATH=/var/run/docker.sock
 NEST_DOCKER_ENABLE_NETWORK_HOST=true
 ```
 
-### 4. Run with Docker Compose
+### 4. Chạy với Docker Compose
 
 ```bash
 docker-compose up -d
 ```
 
-### 5. Run development mode
+### 5. Chạy development mode
 
 ```bash
 # Development
@@ -108,7 +108,7 @@ pnpm run start:prod
 
 ### Hydra Management APIs
 
-#### Create Account
+#### Tạo Account
 ```http
 POST /hydra/account
 Content-Type: application/json
@@ -118,7 +118,7 @@ Content-Type: application/json
 }
 ```
 
-#### Create Party
+#### Tạo Party
 ```http
 POST /hydra/party
 Content-Type: application/json
@@ -129,7 +129,7 @@ Content-Type: application/json
 }
 ```
 
-#### Create Hydra Node
+#### Tạo Hydra Node
 ```http
 POST /hydra/node
 Content-Type: application/json
@@ -191,7 +191,7 @@ pnpm run test:cov
 pnpm run test:watch
 ```
 
-## 📁 Project Structure
+## 📁 Cấu trúc dự án
 
 ```
 src/
@@ -213,20 +213,20 @@ src/
 └── utils/                  # Utility functions
 ```
 
-## 🔧 NPM Scripts
+## 🔧 Scripts NPM
 
 ```bash
 # Development
-pnpm run start:dev          # Run development server with watch mode
-pnpm run start:debug        # Run debug mode
+pnpm run start:dev          # Chạy development server với watch mode
+pnpm run start:debug        # Chạy debug mode
 
 # Build & Production
-pnpm run build              # Build application
-pnpm run start:prod         # Run production build
+pnpm run build              # Build ứng dụng
+pnpm run start:prod         # Chạy production build
 
 # Code Quality
-pnpm run lint               # Lint code with ESLint
-pnpm run format             # Format code with Prettier
+pnpm run lint               # Lint code với ESLint
+pnpm run format             # Format code với Prettier
 
 # Database
 pnpm run typeorm            # TypeORM CLI commands
@@ -238,7 +238,7 @@ pnpm run typeorm            # TypeORM CLI commands
 # Build Docker image
 docker build -t hydra-hexcore .
 
-# Run with Docker Compose
+# Run với Docker Compose
 docker-compose up -d
 
 # View logs
@@ -252,26 +252,26 @@ docker-compose down
 
 - JWT-based authentication
 - Role-based access control (RBAC)
-- Input validation with class-validator
-- Rate limiting (requires additional configuration)
+- Input validation với class-validator
+- Rate limiting (cần cấu hình thêm)
 - CORS configuration
 
 ## 🤝 Contributing
 
 1. Fork repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
+2. Tạo feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit changes (`git commit -m 'Add some amazing feature'`)
 4. Push to branch (`git push origin feature/amazing-feature`)
-5. Create Pull Request
+5. Tạo Pull Request
 
 ## 📄 License
 
 UNLICENSED - Private project
 
-## 📞 Support
+## 📞 Hỗ trợ
 
-For support or bug reports, please create an issue on the GitHub repository.
+Để được hỗ trợ hoặc báo cáo bug, vui lòng tạo issue trên GitHub repository.
 
 ---
 
-**Note**: This is a Hydra Head management application on the Cardano blockchain. Knowledge of Cardano and Hydra is required for effective use.
+**Lưu ý**: Đây là một ứng dụng quản lý Hydra Head trên Cardano blockchain. Cần có kiến thức về Cardano và Hydra để sử dụng hiệu quả.
