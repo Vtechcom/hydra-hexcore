@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { jwtConstants } from 'src/constants';
-import { JwtPayload } from 'src/hydra-game/interfaces/jwtPayload.type';
+import { JwtPayload } from 'src/common/interfaces/jwtPayload.type';
 import { JwtHelper } from './jwt.helper';
 
 @Injectable()

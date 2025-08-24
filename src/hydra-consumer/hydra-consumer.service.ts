@@ -7,7 +7,7 @@ import { Consumer, ConsumerStatus } from './entities/Consumer.entity';
 import { QueryConsumersDto } from './dto/query-consumers.dto';
 import { UpdateConsumerDto } from './dto/UpdateConsumer.dto';
 import { ConsumerLoginDto } from './dto/consumer-login.dto';
-import { ConsumerJwtPayload } from 'src/hydra-game/interfaces/jwtPayload.type';
+import { ConsumerJwtPayload } from 'src/common/interfaces/jwtPayload.type';
 import { JwtService } from '@nestjs/jwt';
 import { generateConsumerKey } from 'src/utils/generator.util';
 import { ShareConsumerNodeDto } from './dto/share-consumer-node.dto';

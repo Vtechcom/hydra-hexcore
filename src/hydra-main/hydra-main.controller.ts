@@ -28,7 +28,9 @@ import { JwtService } from '@nestjs/jwt';
 import { HydraAdminService } from './hydra-admin.service';
 import { AdminAuthGuard } from 'src/auth/admin-auth.guard';
 import { ReqClearPartyDataDto } from './dto/request/clear-party-data.dto';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Hydra Main Service')
 @Controller('hydra-main')
 export class HydraMainController {
     constructor(
@@ -37,11 +39,7 @@ export class HydraMainController {
         private hydraAdminService: HydraAdminService,
     ) {}
 
-    @Get('request-node')
-    requestHydraNode() {
-        return 'This route uses a wildcard';
-    }
-
+    @ApiOperation({ summary: 'Get node info' })
     @Get('node-info')
     getCardanoNodeInfo() {
         return this.hydraMainService.getCardanoNodeInfo();
@@ -156,18 +154,8 @@ export class HydraMainController {
         return this.hydraMainService.getAddressUtxo(address);
     }
 
-    // TODO: Helper api for hydra-bridge, remove it later
-    @Post('commit-node')
-    commitToHydraNode(@Body() commitHydraDto: CommitHydraDto) {
-        return this.hydraMainService.commitToHydraNode(commitHydraDto);
-    }
-
-    // TODO: Helper api for hydra-bridge, remove it later
-    @Post('submit-node')
-    submitToHydraNode(@Body() submitBody: SubmitTxHydraDto) {
-        return this.hydraMainService.submitTxToHydraNode(submitBody);
-    }
-
+    @ApiOperation({ summary: 'Get active nodes' })
+    @UseInterceptors(ClassSerializerInterceptor)
     @Get('active-nodes')
     getActiveNodes() {
         return this.hydraMainService.getActiveNodeContainers();

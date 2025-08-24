@@ -21,25 +21,20 @@ import { ReqActivePartyDto } from './dto/request/active-party.dto';
 import { CardanoCliJs } from 'cardanocli-js';
 
 import * as net from 'net';
-import { WalletServer } from 'cardano-wallet-js';
 import { ResActivePartyDto } from './dto/response/active-party.dto';
 import { CommitHydraDto } from './dto/request/commit-hydra.dto';
 import axios from 'axios';
 import { SubmitTxHydraDto } from './dto/request/submit-tx-hydra.dto';
 import { AddressUtxoDto } from './dto/response/address-utxo.dto';
-import { log } from 'node:console';
-
-import { GameRoom } from '../hydra-game/entities/Room.entity';
-import { CreateRoomDto } from '../hydra-game/dto/create-room.dto';
 import { IPaginationOptions } from 'src/interfaces/pagination.type';
 import { HydraDto } from './dto/hydra.dto';
 
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import configuration from 'src/config/configuration';
 import { ReqClearPartyDataDto } from './dto/request/clear-party-data.dto';
 import { resolvePartyDirPath, resolvePersistenceDir } from './utils/path-resolver';
 import { resolveHydraNodeName } from './utils/name-resolver';
+import { OgmiosClientService } from './ogmios-client.service';
 
 type ContainerNode = {
     hydraNodeId: string;
@@ -98,6 +93,8 @@ export class HydraMainService implements OnModuleInit {
         // @InjectRepository(GameRoom)
         // private gameRoomRepository: Repository<GameRoom>,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
+
+        private ogmiosClientService: OgmiosClientService,
     ) {
         const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
         this.docker = new Docker({ socketPath: DOCKER_SOCKET });
@@ -207,6 +204,10 @@ export class HydraMainService implements OnModuleInit {
                 console.log('>>> / file: hydra-main.service.ts:182 / err:', err);
                 this.cacheManager.set('activeNodes', []);
             });
+    }
+
+    async testOgmiosConnection() {
+        return this.ogmiosClientService.test();
     }
 
     async getActiveNodeContainers() {
@@ -365,7 +366,7 @@ export class HydraMainService implements OnModuleInit {
 
     cleanJSON(_jsonString: string) {
         let jsonString = _jsonString
-            .replace(/^[\s\S]*?{/, "{")
+            .replace(/^[\s\S]*?{/, '{')
             .replace(/^[^{]*\{\{/, '{') // Replace double {{
             .replace(/\}\}[^}]*$/, '}') // Replace double }} at end
             .replace(/^\uFFFD/, '') // remove replacement character at start
@@ -377,11 +378,11 @@ export class HydraMainService implements OnModuleInit {
             .replace(/\u2026/g, '...')
             .replace(/^\uFFFD/, '')
             .replace(/[^\x20-\x7E]/g, '') // non-printable
-            .trim()
+            .trim();
         if (!jsonString.startsWith('{')) {
-            jsonString = _jsonString.slice(1, jsonString.length)
+            jsonString = _jsonString.slice(1, jsonString.length);
         }
-        return jsonString
+        return jsonString;
     }
 
     async getListAccount() {
@@ -642,7 +643,7 @@ export class HydraMainService implements OnModuleInit {
     async checkUtxoAccount(account: Account): Promise<boolean> {
         const a_utxo = await this.cardanoCliQueryUtxo(account.pointerAddress);
         const totalLovelace = Object.values(a_utxo).reduce((sum, item) => sum + item.value.lovelace, 0);
-        console.log(`[${account.pointerAddress}]:[${totalLovelace} lovelace]`)
+        console.log(`[${account.pointerAddress}]:[${totalLovelace} lovelace]`);
         return totalLovelace >= this.CONSTANTS.cardanoAccountMinLovelace ? true : false;
     }
 
@@ -742,19 +743,21 @@ export class HydraMainService implements OnModuleInit {
             }
 
             const cleanArg = (str: string | number) =>
-                String(str).replace(/[^\x20-\x7E]/g, '').trim();
+                String(str)
+                    .replace(/[^\x20-\x7E]/g, '')
+                    .trim();
             /**
-             * NOTE: 
+             * NOTE:
              * - Cập nhật command run node cho Hydra v0.21.0
              * - Chuyển sang chế độ network custom brigde:
-             * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network` 
+             * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network`
              * - Thêm advertise param
              */
             /**
-             * NOTE: 
+             * NOTE:
              * - Cập nhật command run node cho Hydra v0.22.2
              * - Chuyển sang chế độ network custom brigde:
-             * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network` 
+             * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network`
              * - Thêm advertise param
              */
             const peerNodeParams = peerNodes
@@ -770,56 +773,70 @@ export class HydraMainService implements OnModuleInit {
                     ];
                 })
                 .flat();
-                const container = await this.docker.createContainer({
-                    Image: this.CONSTANTS.hydraNodeImage,
-                    Cmd: [
-                        '--node-id', `${nodeName}`,
-                        '--listen', `0.0.0.0:${node.port + 1000}`,
-                        '--advertise', `${nodeName}:${node.port + 1000}`, 
-                        '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
-                        '--persistence-dir', `/data/${resolvePersistenceDir(party.id, nodeName)}`,
-                        '--api-host', '0.0.0.0',
-                        '--api-port', `${node.port}`,
-                        ...peerNodeParams,
-                        '--cardano-signing-key', `/data/party-${party.id}/${nodeName}.cardano.sk`,
-                        '--hydra-scripts-tx-id', `${this.CONSTANTS.hydraNodeScriptTxId}`,
-//
-                        '--deposit-period', `240s`, //
-                        '--contestation-period', `60s`,//
-                        
-                        '--testnet-magic', `${this.CONSTANTS.hydraNodeNetworkId}`,
-                        '--node-socket', `/cardano-node/node.socket`,
-                        '--ledger-protocol-parameters', `/data/party-${party.id}/protocol-parameters.json`,
+            const container = await this.docker.createContainer({
+                Image: this.CONSTANTS.hydraNodeImage,
+                Cmd: [
+                    '--node-id',
+                    `${nodeName}`,
+                    '--listen',
+                    `0.0.0.0:${node.port + 1000}`,
+                    '--advertise',
+                    `${nodeName}:${node.port + 1000}`,
+                    '--hydra-signing-key',
+                    `/data/party-${party.id}/${nodeName}.sk`,
+                    '--persistence-dir',
+                    `/data/${resolvePersistenceDir(party.id, nodeName)}`,
+                    '--api-host',
+                    '0.0.0.0',
+                    '--api-port',
+                    `${node.port}`,
+                    ...peerNodeParams,
+                    '--cardano-signing-key',
+                    `/data/party-${party.id}/${nodeName}.cardano.sk`,
+                    '--hydra-scripts-tx-id',
+                    `${this.CONSTANTS.hydraNodeScriptTxId}`,
+                    //
+                    '--deposit-period',
+                    `240s`, //
+                    '--contestation-period',
+                    `60s`, //
+
+                    '--testnet-magic',
+                    `${this.CONSTANTS.hydraNodeNetworkId}`,
+                    '--node-socket',
+                    `/cardano-node/node.socket`,
+                    '--ledger-protocol-parameters',
+                    `/data/party-${party.id}/protocol-parameters.json`,
+                ],
+                HostConfig: {
+                    NetworkMode: 'hydra-network',
+                    Binds: [
+                        `${this.CONSTANTS.hydraNodeFolder}:/data`,
+                        `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
                     ],
-                    HostConfig: {
-                        NetworkMode: 'hydra-network',
-                        Binds: [
-                            `${this.CONSTANTS.hydraNodeFolder}:/data`,
-                            `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
-                        ],
-                        PortBindings: {
-                            [`${node.port}/tcp`]: [{ HostPort: `${node.port}` }],
-                            [`${node.port + 1000}/tcp`]: [{ HostPort: `${node.port + 1000}` }],
-                        },
+                    PortBindings: {
+                        [`${node.port}/tcp`]: [{ HostPort: `${node.port}` }],
+                        [`${node.port + 1000}/tcp`]: [{ HostPort: `${node.port + 1000}` }],
                     },
-                    ExposedPorts: {
-                        [`${node.port}/tcp`]: {},
-                        [`${node.port + 1000}/tcp`]: {},
-                    },
-                    name: nodeName,
-                    Labels: {
-                        [this.CONSTANTS.hydraPartyLabel]: party.id.toString(),
-                        [this.CONSTANTS.hydraNodeLabel]: node.id.toString(),
-                    },
-                    Env: [
-                        'ETCD_AUTO_COMPACTION_MODE=periodic',
-                        'ETCD_AUTO_COMPACTION_RETENTION=168h',
-                        // Giảm nhịp heartbeat, tăng timeout election để hạn chế lease drop
-                        'ETCD_HEARTBEAT_INTERVAL=1000', // 1000ms
-                        'ETCD_ELECTION_TIMEOUT=5000',   // 5000ms
-                    ],
-                    User: `${process.getuid()}:${process.getgid()}`,
-                });
+                },
+                ExposedPorts: {
+                    [`${node.port}/tcp`]: {},
+                    [`${node.port + 1000}/tcp`]: {},
+                },
+                name: nodeName,
+                Labels: {
+                    [this.CONSTANTS.hydraPartyLabel]: party.id.toString(),
+                    [this.CONSTANTS.hydraNodeLabel]: node.id.toString(),
+                },
+                Env: [
+                    'ETCD_AUTO_COMPACTION_MODE=periodic',
+                    'ETCD_AUTO_COMPACTION_RETENTION=168h',
+                    // Giảm nhịp heartbeat, tăng timeout election để hạn chế lease drop
+                    'ETCD_HEARTBEAT_INTERVAL=1000', // 1000ms
+                    'ETCD_ELECTION_TIMEOUT=5000', // 5000ms
+                ],
+                User: `${process.getuid()}:${process.getgid()}`,
+            });
             // @ts-ignore
             node.container = {
                 id: container.id,
@@ -898,37 +915,41 @@ export class HydraMainService implements OnModuleInit {
                 .where('party.id IN (:...ids)', { ids: partyIds })
                 .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
                 .leftJoinAndSelect('hydraNodes.cardanoAccount', 'cardanoAccount')
-                .getManyAndCount()
+                .getManyAndCount();
 
             if (!count || !parties) {
                 throw new NotFoundException('Invalid Party Id');
             }
             // await access(partyDirPath, constants.R_OK | constants.W_OK);
-            const removedDirs = [] as string[]
-            const errors = [] as string[]
+            const removedDirs = [] as string[];
+            const errors = [] as string[];
             for (const party of parties) {
                 for (const node of party.hydraNodes) {
-                    const persistenceDir = resolvePersistenceDir(party.id, resolveHydraNodeName(node.id), this.CONSTANTS.hydraNodeFolder)
-                    console.log('persistenceDir', persistenceDir)
+                    const persistenceDir = resolvePersistenceDir(
+                        party.id,
+                        resolveHydraNodeName(node.id),
+                        this.CONSTANTS.hydraNodeFolder,
+                    );
+                    console.log('persistenceDir', persistenceDir);
                     try {
                         await access(persistenceDir, constants.R_OK | constants.W_OK);
-                        await rm(persistenceDir, { recursive: true, force: true })
-                        removedDirs.push(persistenceDir)
+                        await rm(persistenceDir, { recursive: true, force: true });
+                        removedDirs.push(persistenceDir);
                     } catch (error) {
-                        errors.push(error.message)
+                        errors.push(error.message);
                     }
                 }
             }
             return {
                 removedDirs,
                 errors,
-                parties
-            }
+                parties,
+            };
         } catch (error: any) {
-            console.log('error', error)
+            console.log('error', error);
             // console.error(`Error while accessing party dir: ${partyDirPath}`, error.message);
             // await mkdir(partyDirPath, { recursive: true });
-            return []
+            return [];
         }
     }
 
@@ -981,7 +1002,7 @@ export class HydraMainService implements OnModuleInit {
     }
 
     getDockerContainerName(hydraNode: HydraNode) {
-        return resolveHydraNodeName(hydraNode.id)
+        return resolveHydraNodeName(hydraNode.id);
     }
 
     async commitToHydraNode(commitHydraDto: CommitHydraDto) {

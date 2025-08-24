@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { JwtService } from '@nestjs/jwt';
 import { jwtConstants } from 'src/constants';
 import { JwtHelper } from './jwt.helper';
-import { AdminJwtPayload } from 'src/hydra-game/interfaces/jwtPayload.type';
+import { AdminJwtPayload } from 'src/common/interfaces/jwtPayload.type';
 
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
