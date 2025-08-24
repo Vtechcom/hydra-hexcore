@@ -705,38 +705,27 @@ export class HydraMainService implements OnModuleInit {
                 .flat();
             const container = await this.docker.createContainer({
                 Image: this.CONSTANTS.hydraNodeImage,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                // prettier-ignore
                 Cmd: [
-                    '--node-id',
-                    `${nodeName}`,
-                    '--listen',
-                    `0.0.0.0:${node.port + 1000}`,
-                    '--advertise',
-                    `${nodeName}:${node.port + 1000}`,
-                    '--hydra-signing-key',
-                    `/data/party-${party.id}/${nodeName}.sk`,
-                    '--persistence-dir',
-                    `/data/${resolvePersistenceDir(party.id, nodeName)}`,
-                    '--api-host',
-                    '0.0.0.0',
-                    '--api-port',
-                    `${node.port}`,
+                    '--node-id', `${nodeName}`,
+                    '--listen', `0.0.0.0:${node.port + 1000}`,
+                    '--advertise', `${nodeName}:${node.port + 1000}`, 
+                    '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
+                    '--persistence-dir', `/data/${resolvePersistenceDir(party.id, nodeName)}`,
+                    '--api-host', '0.0.0.0',
+                    '--api-port', `${node.port}`,
                     ...peerNodeParams,
-                    '--cardano-signing-key',
-                    `/data/party-${party.id}/${nodeName}.cardano.sk`,
-                    '--hydra-scripts-tx-id',
-                    `${this.CONSTANTS.hydraNodeScriptTxId}`,
-                    //
-                    '--deposit-period',
-                    `240s`, //
-                    '--contestation-period',
-                    `60s`, //
+                    '--cardano-signing-key', `/data/party-${party.id}/${nodeName}.cardano.sk`,
+                    '--hydra-scripts-tx-id', `${this.CONSTANTS.hydraNodeScriptTxId}`,
+                    '--persistence-rotate-after', '15000', // 15_000 seq
 
-                    '--testnet-magic',
-                    `${this.CONSTANTS.hydraNodeNetworkId}`,
-                    '--node-socket',
-                    `/cardano-node/node.socket`,
-                    '--ledger-protocol-parameters',
-                    `/data/party-${party.id}/protocol-parameters.json`,
+                    '--deposit-period', `120s`,
+                    '--contestation-period', `60s`,
+                    
+                    '--testnet-magic', `${this.CONSTANTS.hydraNodeNetworkId}`,
+                    '--node-socket', `/cardano-node/node.socket`,
+                    '--ledger-protocol-parameters', `/data/party-${party.id}/protocol-parameters.json`,
                 ],
                 HostConfig: {
                     NetworkMode: 'hydra-network',
