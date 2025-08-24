@@ -39,6 +39,12 @@ export class HydraMainController {
         private hydraAdminService: HydraAdminService,
     ) {}
 
+    @ApiOperation({ summary: 'Get ogmios info' })
+    @Get('ogmios')
+    getAccountInfo(@Req() req: any) {
+        return this.hydraMainService.testOgmiosConnection();
+    }
+
     @ApiOperation({ summary: 'Get node info' })
     @Get('node-info')
     getCardanoNodeInfo() {
@@ -93,8 +99,6 @@ export class HydraMainController {
         if (limit > 50) {
             limit = 50;
         }
-        console.log(typeof page, limit);
-
         return infinityPagination(
             await this.hydraMainService.getListHydraNode({
                 pagination: {

@@ -11,9 +11,21 @@ importers:
       '@cardano-ogmios/client':
         specifier: ^6.13.0
         version: 6.13.0(encoding@0.1.13)
+      '@cardano-ogmios/schema':
+        specifier: ^6.13.0
+        version: 6.13.0
       '@emurgo/cardano-serialization-lib-nodejs':
         specifier: ^13.2.0
         version: 13.2.0
+      '@hydra-sdk/cardano-wasm':
+        specifier: ^0.0.5
+        version: 0.0.5
+      '@hydra-sdk/core':
+        specifier: ^1.0.5
+        version: 1.0.5
+      '@hydra-sdk/transaction':
+        specifier: ^1.0.7
+        version: 1.0.7
       '@keyv/redis':
         specifier: ^4.3.2
         version: 4.3.2
@@ -394,11 +406,17 @@ packages:
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
 
+  '@emurgo/cardano-serialization-lib-browser@14.1.2':
+    resolution: {integrity: sha512-qtGbi7EP6u0DiiD+CMA5TZVfqgGBDDHsWCXplC7LuuyGbKXT53T9LOvi1BcqV6qaZYeajmwm2HbP6bdVqpwinw==}
+
   '@emurgo/cardano-serialization-lib-nodejs@10.2.0':
     resolution: {integrity: sha512-rRWBQcbQlMj4GS7gt6toxRzY9cjMfFBWYKWrfH+eEqUXSO+3blKKA3T/yra3khxU/8+EAY1T94uoUDvjkrpTzg==}
 
   '@emurgo/cardano-serialization-lib-nodejs@13.2.0':
     resolution: {integrity: sha512-Bz1zLGEqBQ0BVkqt1OgMxdBOE3BdUWUd7Ly9Ecr/aUwkA8AV1w1XzBMe4xblmJHnB1XXNlPH4SraXCvO+q0Mig==}
+
+  '@emurgo/cardano-serialization-lib-nodejs@14.1.2':
+    resolution: {integrity: sha512-g8sxCEaQXqRt4A3zmhebuo+pMucVDs/4FlkUD+J+awJCJMAkK7eCFBEb09d8+jREec687D5fY+FG9NemExSQhQ==}
 
   '@eslint-community/eslint-utils@4.4.1':
     resolution: {integrity: sha512-s3O3waFUrMV8P/XaF/+ZTp1X9XBZW1a4B97ZnjQF2KYWaFD2A8KyFBsrsfSjEmjn3RGWAIuvlneuZm3CUK3jbA==}
@@ -433,6 +451,18 @@ packages:
   '@humanwhocodes/object-schema@2.0.3':
     resolution: {integrity: sha512-93zYdMES/c1D69yZiKDBj0V24vqNzB/koF26KPaagAfd3P/4gUlh3Dys5ogAK+Exi9QyzlD8x/08Zt7wIKcDcA==}
     deprecated: Use @eslint/object-schema instead
+
+  '@hydra-sdk/cardano-wasm@0.0.5':
+    resolution: {integrity: sha512-UeNKoug4elkpjniu8WnaXIzH/Kc3Paap6EHVSABM0/AK3l1ByckB9U5dURUEfBdfc8wajjOm2KxQ4d/0CWH+tA==}
+    engines: {node: '>=18'}
+
+  '@hydra-sdk/core@1.0.5':
+    resolution: {integrity: sha512-hTy5btXjkRAV6ELLo1FeVPU1mdeCLhAjGJc356rnrbMRFvrSoHsmEODR2iSlxAWrKIhG4b6exq6MDEqBZZWGZA==}
+    engines: {node: '>=10'}
+
+  '@hydra-sdk/transaction@1.0.7':
+    resolution: {integrity: sha512-a1ihrT/Pf8UNxhOB/LLbNntQeOXMNuvTCCo4/sl//sZaH7fr8+C458BVzO1rjy+FlZPos6FbPmPTpVu8ZjooJg==}
+    engines: {node: '>=10'}
 
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -779,6 +809,9 @@ packages:
 
   '@scarf/scarf@1.4.0':
     resolution: {integrity: sha512-xxeapPiUXdZAE3che6f3xogoJPeZgig6omHEy1rIY5WVsB3H2BHNnZH+gHG6x91SCWyQCzWGsuL2Hh3ClO5/qQ==}
+
+  '@scure/base@1.2.6':
+    resolution: {integrity: sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg==}
 
   '@sinclair/typebox@0.27.8':
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
@@ -2550,6 +2583,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  json-bigint@1.0.0:
+    resolution: {integrity: sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ==}
+
   json-buffer@3.0.1:
     resolution: {integrity: sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ==}
 
@@ -4256,9 +4292,13 @@ snapshots:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
 
+  '@emurgo/cardano-serialization-lib-browser@14.1.2': {}
+
   '@emurgo/cardano-serialization-lib-nodejs@10.2.0': {}
 
   '@emurgo/cardano-serialization-lib-nodejs@13.2.0': {}
+
+  '@emurgo/cardano-serialization-lib-nodejs@14.1.2': {}
 
   '@eslint-community/eslint-utils@4.4.1(eslint@8.57.1)':
     dependencies:
@@ -4297,6 +4337,25 @@ snapshots:
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/object-schema@2.0.3': {}
+
+  '@hydra-sdk/cardano-wasm@0.0.5':
+    dependencies:
+      '@emurgo/cardano-serialization-lib-browser': 14.1.2
+      '@emurgo/cardano-serialization-lib-nodejs': 14.1.2
+
+  '@hydra-sdk/core@1.0.5':
+    dependencies:
+      '@hydra-sdk/cardano-wasm': 0.0.5
+      '@scure/base': 1.2.6
+      bip39: 3.1.0
+
+  '@hydra-sdk/transaction@1.0.7':
+    dependencies:
+      '@hydra-sdk/cardano-wasm': 0.0.5
+      '@hydra-sdk/core': 1.0.5
+      '@scure/base': 1.2.6
+      bip39: 3.1.0
+      json-bigint: 1.0.0
 
   '@isaacs/cliui@8.0.2':
     dependencies:
@@ -4764,6 +4823,8 @@ snapshots:
       '@redis/client': 1.6.0
 
   '@scarf/scarf@1.4.0': {}
+
+  '@scure/base@1.2.6': {}
 
   '@sinclair/typebox@0.27.8': {}
 
@@ -6951,6 +7012,10 @@ snapshots:
     optional: true
 
   jsesc@3.1.0: {}
+
+  json-bigint@1.0.0:
+    dependencies:
+      bignumber.js: 9.3.1
 
   json-buffer@3.0.1: {}
 

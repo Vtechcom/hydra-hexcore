@@ -10,6 +10,7 @@ import { User } from './entities/User.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { jwtConstants } from 'src/constants';
 import { OgmiosClientService } from './ogmios-client.service';
+import { OgmiosController } from './ogmios.controller';
 @Module({
     imports: [
         TypeOrmModule.forFeature([HydraNode, Account, HydraParty, User]),
@@ -19,7 +20,7 @@ import { OgmiosClientService } from './ogmios-client.service';
         }),
     ],
     providers: [HydraMainService, HydraAdminService, OgmiosClientService],
-    controllers: [HydraMainController],
+    controllers: [HydraMainController, OgmiosController],
     exports: [JwtModule, HydraAdminService, HydraMainService, OgmiosClientService],
 })
 export class HydraMainModule {}

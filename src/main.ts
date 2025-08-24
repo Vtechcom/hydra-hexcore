@@ -5,6 +5,7 @@ import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
 import { swaggerConfig } from './config/swagger.config';
 import { ResolvePromisesInterceptor } from './common/interceptors/serializer.interceptor';
+import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
@@ -25,6 +26,7 @@ async function bootstrap() {
         // https://github.com/typestack/class-transformer/issues/549
         new ResolvePromisesInterceptor(),
         new ClassSerializerInterceptor(app.get(Reflector)),
+        new BigIntInterceptor(),
         new BaseResponseInterceptor(),
     );
     const documentFactory = () => SwaggerModule.createDocument(app, swaggerConfig);

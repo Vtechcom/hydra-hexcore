@@ -25,7 +25,7 @@ import { ResActivePartyDto } from './dto/response/active-party.dto';
 import { CommitHydraDto } from './dto/request/commit-hydra.dto';
 import axios from 'axios';
 import { SubmitTxHydraDto } from './dto/request/submit-tx-hydra.dto';
-import { AddressUtxoDto } from './dto/response/address-utxo.dto';
+import { AddressUtxoDto, ReferenceScript, UTxOObject, UTxOObjectValue } from './dto/response/address-utxo.dto';
 import { IPaginationOptions } from 'src/interfaces/pagination.type';
 import { HydraDto } from './dto/hydra.dto';
 
@@ -35,6 +35,8 @@ import { ReqClearPartyDataDto } from './dto/request/clear-party-data.dto';
 import { resolvePartyDirPath, resolvePersistenceDir } from './utils/path-resolver';
 import { resolveHydraNodeName } from './utils/name-resolver';
 import { OgmiosClientService } from './ogmios-client.service';
+import { convertUtxoToUTxOObject } from './utils/ogmios-converter';
+import { convertBigIntToString } from 'src/utils/bigint.utils';
 
 type ContainerNode = {
     hydraNodeId: string;
@@ -74,11 +76,8 @@ export class HydraMainService implements OnModuleInit {
         tip: {
             block: 0,
             epoch: 0,
-            era: 'Babbage',
             hash: '',
             slot: 0,
-            slotInEpoch: 0,
-            slotsToEpochEnd: 0,
             syncProgress: '0.00',
         },
     };
@@ -216,93 +215,24 @@ export class HydraMainService implements OnModuleInit {
     }
 
     async cardanoQueryTip() {
-        const output = await this.execInContainer(this.CONSTANTS.cardanoNodeServiceName, [
-            'cardano-cli',
-            'query',
-            'tip',
-            `--socket-path`,
-            `/workspace/node.socket`,
-            '--testnet-magic',
-            '1',
-        ]);
-        try {
-            const tip = JSON.parse(this.cleanJSON(output));
-            this.cardanoNode.tip = tip;
-        } catch (err) {
-            console.log(`Error parse json`, err);
-        }
-        return this.cardanoNode.tip;
+        const tip = await this.ogmiosClientService.queryTip();
+        return tip;
     }
 
     async getCardanoNodeInfo() {
-        const cardanoCli = new CardanoCliJs({
-            cliPath: `docker exec cardano-node cardano-cli`,
-            dir: `/workspace`,
-            era: '',
-            network: '1',
-            socketPath: '/workspace/node.socket',
-            shelleyGenesis: '/workspace/shelley-genesis.json',
-        });
-        const output = await cardanoCli.runCommand({
-            command: 'query',
-            subcommand: 'protocol-parameters',
-            parameters: [
-                { name: 'socket-path', value: '/workspace/node.socket' },
-                { name: 'testnet-magic', value: '1' },
-            ],
-        });
-        const protocolParameters = JSON.parse(Buffer.from(output).toString());
-        await this.cardanoQueryTip();
+        const tip = await this.ogmiosClientService.queryTip();
+        const protocolParameters = await this.ogmiosClientService.getProtocolParameters();
         return {
-            tip: this.cardanoNode.tip,
+            tip,
             protocolParameters,
         };
     }
 
-    async cardanoCliQueryUtxo(address: string) {
-        const output = await this.execInContainer(this.CONSTANTS.cardanoNodeServiceName, [
-            'cardano-cli',
-            'query',
-            'utxo',
-            `--address`,
-            `${address}`,
-            `--socket-path`,
-            `/workspace/node.socket`,
-            '--testnet-magic',
-            '1',
-            '--output-json',
-        ]);
+    async getAddressUtxo(address: string): Promise<AddressUtxoDto> {
         try {
-            const data = JSON.parse(this.cleanJSON(output));
-            return data as Record<string, any>;
-        } catch (err) {
-            console.log(`[Error parse json] [ ${output} ] `, err);
-            return {};
-        }
-    }
-
-    async getAddressUtxo(address: string) {
-        try {
-            const cardanoCli = new CardanoCliJs({
-                cliPath: `docker exec cardano-node cardano-cli`,
-                dir: `/workspace`,
-                era: '',
-                network: '1',
-                socketPath: '/workspace/node.socket',
-                shelleyGenesis: '/workspace/shelley-genesis.json',
-            });
-            const output = await cardanoCli.runCommand({
-                command: 'query',
-                subcommand: 'utxo',
-                parameters: [
-                    { name: 'address', value: address },
-                    { name: 'socket-path', value: '/workspace/node.socket' },
-                    { name: 'testnet-magic', value: '1' },
-                    { name: 'output-json', value: '' },
-                ],
-            });
-            const utxo = JSON.parse(Buffer.from(output).toString());
-            return utxo as AddressUtxoDto;
+            const addrUTxOs = await this.ogmiosClientService.queryUtxoByAddress(address);
+            const utxoObject = convertUtxoToUTxOObject(addrUTxOs);
+            return utxoObject;
         } catch (err) {
             console.log(`[Error getAddressUtxo] [${address}] `, err);
             throw new BadRequestException('Error getAddressUtxo');
@@ -641,7 +571,7 @@ export class HydraMainService implements OnModuleInit {
     }
 
     async checkUtxoAccount(account: Account): Promise<boolean> {
-        const a_utxo = await this.cardanoCliQueryUtxo(account.pointerAddress);
+        const a_utxo = await this.getAddressUtxo(account.pointerAddress);
         const totalLovelace = Object.values(a_utxo).reduce((sum, item) => sum + item.value.lovelace, 0);
         console.log(`[${account.pointerAddress}]:[${totalLovelace} lovelace]`);
         return totalLovelace >= this.CONSTANTS.cardanoAccountMinLovelace ? true : false;

@@ -23,7 +23,7 @@ services:
     depends_on:
       - cardano-node
     ports:
-      - ${OGMIOS_PORT:-8092}:8092
+      - ${OGMIOS_PORT:-1337}:1337
     volumes:
       # mount socket để ogmios nói chuyện với cardano-node
       - ./cardano-node:/cardano-node
