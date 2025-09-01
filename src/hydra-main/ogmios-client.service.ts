@@ -168,15 +168,21 @@ export class OgmiosClientService implements OnModuleInit, OnModuleDestroy {
             const syncProgress =
                 ledgerTip.slot && networkTip.slot ? ((networkTip.slot / ledgerTip.slot) * 100).toFixed(2) : '0.00';
             return {
-                block: networkBlockHeight,
+                block: networkBlockHeight as number,
                 epoch,
                 hash: networkTip.id,
                 slot: networkTip.slot,
                 slotInEpoch,
                 slotsToEpochEnd,
                 syncProgress,
-                ledgerTip,
-                eraStart,
+                ledgerTip: {
+                    id: ledgerTip.id,
+                    slot: ledgerTip.slot,
+                },
+                eraStart: {
+                    epoch: eraStart.epoch,
+                    slot: eraStart.slot,
+                },
             };
         } catch (error) {
             this.logger.error('Failed to get current tip:', error);

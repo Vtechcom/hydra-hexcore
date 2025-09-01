@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { HydraNode } from './entities/HydraNode.entity';
 import { In, Repository } from 'typeorm';
@@ -69,6 +69,7 @@ export class HydraMainService implements OnModuleInit {
         // Dockerize
         hydraPartyLabel: 'party_id',
         hydraNodeLabel: 'node_id',
+        dockerSock: process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine',
     };
 
     private cardanoNode = {
@@ -78,9 +79,20 @@ export class HydraMainService implements OnModuleInit {
             epoch: 0,
             hash: '',
             slot: 0,
+            slotInEpoch: 0,
+            slotsToEpochEnd: 0,
             syncProgress: '0.00',
+            ledgerTip: {
+                id: '',
+                slot: 0,
+            },
+            eraStart: {
+                epoch: 0,
+                slot: 0,
+            },
         },
     };
+    private logger = new Logger(HydraMainService.name);
 
     constructor(
         @InjectRepository(HydraNode)
@@ -163,14 +175,15 @@ export class HydraMainService implements OnModuleInit {
             '--testnet-magic',
             '1',
         ]);
+        this.logger.verbose('>>> / file: hydra-main.service.ts:121 / execInContainer:', output);
         this.updateHydraContainerStatus();
         try {
-            const tip = JSON.parse(this.cleanJSON(output));
-            console.log('>>> / file: hydra-main.service.ts:121 / tip:', tip);
+            const tip = await this.cardanoQueryTip();
+            this.logger.log('>>> / file: hydra-main.service.ts:121 / tip:', tip);
             this.cardanoNode.tip = tip;
             await this.cacheManager.set('cardanoNodeTip', tip);
         } catch (err) {
-            console.log(`Error parse json`, err);
+            this.logger.error('Error parse json', err);
         }
         return;
     }
@@ -198,9 +211,10 @@ export class HydraMainService implements OnModuleInit {
                         };
                     });
                 this.cacheManager.set<Caching['activeNodes']>('activeNodes', activeNodes);
+                this.logger.log('>>> / file: hydra-main.service.ts:217 / Active nodes updated:', activeNodes);
             })
             .catch(err => {
-                console.log('>>> / file: hydra-main.service.ts:182 / err:', err);
+                this.logger.error('>>> / file: hydra-main.service.ts:217 / Error fetching active nodes:', err);
                 this.cacheManager.set('activeNodes', []);
             });
     }
@@ -754,7 +768,7 @@ export class HydraMainService implements OnModuleInit {
                     'ETCD_HEARTBEAT_INTERVAL=1000', // 1000ms
                     'ETCD_ELECTION_TIMEOUT=5000', // 5000ms
                 ],
-                User: `${process.getuid()}:${process.getgid()}`,
+                User: `${process.getuid ? process.getuid() : ''}:${process.getgid ? process.getgid() : ''}`,
             });
             // @ts-ignore
             node.container = {
