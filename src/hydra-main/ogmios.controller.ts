@@ -76,8 +76,10 @@ export class OgmiosController {
         description: 'UTxO set',
         type: Object, // Define the UTxO set response type
     })
-    async queryUtxoByAddresses(@Query('addresses') addresses: string[]) {
-        return await this.ogmiosClientService.queryUtxo({ addresses });
+    async queryUtxoByAddresses(@Query('addresses') addresses: string[] | string) {
+        // If a single address is provided as a string, convert it to an array
+        const addressArray = Array.isArray(addresses) ? addresses : [addresses];
+        return await this.ogmiosClientService.queryUtxo({ addresses: addressArray });
     }
 
     @Get('address/:address/utxo')
