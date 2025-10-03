@@ -368,6 +368,7 @@ export class HydraMainService implements OnModuleInit {
             relations: {
                 cardanoAccount: true,
             },
+            order: { id: 'DESC' },
         });
         const activeNodes = await this.getActiveNodeContainers();
         return nodes.map(node => {
@@ -565,6 +566,7 @@ export class HydraMainService implements OnModuleInit {
             .createQueryBuilder('party')
             .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
             .leftJoinAndSelect('hydraNodes.cardanoAccount', 'cardanoAccount')
+            .addOrderBy('party.id', 'DESC')
             .getMany();
         const activeNodes = await this.getActiveNodeContainers();
         return parties.map(party => {
@@ -725,7 +727,7 @@ export class HydraMainService implements OnModuleInit {
                     '--listen', `0.0.0.0:${node.port + 1000}`,
                     '--advertise', `${nodeName}:${node.port + 1000}`, 
                     '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
-                    '--persistence-dir', `/data/${resolvePersistenceDir(party.id, nodeName)}`,
+                    '--persistence-dir', `/data${resolvePersistenceDir(party.id, nodeName)}`,
                     '--api-host', '0.0.0.0',
                     '--api-port', `${node.port}`,
                     ...peerNodeParams,
