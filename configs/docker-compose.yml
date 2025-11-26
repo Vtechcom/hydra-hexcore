@@ -2,14 +2,14 @@ version: "3.9"
 
 services:
   cardano-node:
-    image: ghcr.io/intersectmbo/cardano-node:10.2.1
+    image: ghcr.io/intersectmbo/cardano-node:10.5.2
     container_name: cardano-node
     environment:
       - CARDANO_NODE_SOCKET_PATH=/workspace/node.socket
     volumes:
-      - ./database:/db # Persistent volume for the database
-      - ./:/workspace # Path for the node socket
-      - node-ipc:/workspace # Shared volume for socket communication
+      - ./db/db:/db # Persistent volume for the database
+      - ./cardano:/workspace # Path for the node socket
+      # - node-ipc:/workspace # Shared volume for socket communication
     ports:
       - "8091:8091" # Expose port 8091
     command: >
@@ -26,8 +26,8 @@ services:
       - ${OGMIOS_PORT:-1337}:1337
     volumes:
       # mount socket để ogmios nói chuyện với cardano-node
-      - ./cardano-node:/cardano-node
-      - node-ipc:/cardano-node # Shared volume for socket communication
+      - ./cardano:/cardano-node
+      # - node-ipc:/cardano-node # Shared volume for socket communication
     command: [ "--node-socket", "/cardano-node/node.socket", "--node-config", "/config/preprod/cardano-node/config.json", "--host", "0.0.0.0" ]
 
 volumes:
