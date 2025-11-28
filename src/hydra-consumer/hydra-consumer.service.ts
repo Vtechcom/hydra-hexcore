@@ -82,15 +82,27 @@ export class HydraConsumerService implements OnModuleInit {
         if (!hydraNode) {
             throw new HttpException('Hydra node not found', HttpStatus.NOT_FOUND);
         }
-        const url = `localhost:${hydraNode.port}`;
-        const mapper = await this.mapperRepository.create({
-            consumer,
-            consumerKey: generateConsumerKey(),
-            url: url,
-            isActive: true,
-            hydraNode,
+        const mapperExists = await this.mapperRepository.findOne({
+            where: { consumer, hydraNode },
         });
-        return this.mapperRepository.save(mapper);
+        if (mapperExists && mapperExists.isActive) {
+            throw new HttpException('Mapper already exists', HttpStatus.BAD_REQUEST);
+        } else if (mapperExists && !mapperExists.isActive) {
+            mapperExists.isActive = true;
+            mapperExists.url = `localhost:${hydraNode.port}`;
+            await this.mapperRepository.save(mapperExists);
+            return mapperExists;
+        } else {
+            const url = `localhost:${hydraNode.port}`;
+            const mapper = await this.mapperRepository.create({
+                consumer,
+                consumerKey: generateConsumerKey(),
+                url: url,
+                isActive: true,
+                hydraNode,
+            });
+            return this.mapperRepository.save(mapper);
+        }
     }
 
     async removeSharedNode(removeConsumerNodeDto: RemoveConsumerNodeDto) {

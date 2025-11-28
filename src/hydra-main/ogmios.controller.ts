@@ -123,7 +123,9 @@ export class OgmiosController {
         description: 'Transaction details',
         type: Object, // Define the transaction response type
     })
-    async queryTransactions(@Query('txHashes') txHashes: `${string}#${number}`[]) {
-        return await this.ogmiosClientService.queryUtxo({ txHashes });
+    async queryTransactions(@Query('txHashes') txHashes: `${string}#${number}`[] | `${string}#${number}`) {
+        // Ensure txHashes is always an array
+        const txHashesArray = Array.isArray(txHashes) ? txHashes : txHashes ? [txHashes] : [];
+        return await this.ogmiosClientService.queryUtxo({ txHashes: txHashesArray });
     }
 }

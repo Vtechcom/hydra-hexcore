@@ -18,6 +18,17 @@ export class ConsumerAuthGuard implements CanActivate {
             const payload = await this.jwtService.verifyAsync<ConsumerJwtPayload>(token, {
                 secret: jwtConstants.secret,
             });
+            
+            // Verify payload structure - must have address and id, must NOT have username or role
+            if (!payload.address || !payload.id) {
+                throw new UnauthorizedException('Invalid token payload structure');
+            }
+            
+            // Ensure this is a Consumer token, not Admin token
+            if ('username' in payload || 'role' in payload) {
+                throw new UnauthorizedException('Invalid token type: Consumer token required');
+            }
+            
             request['user'] = payload;
         } catch (error) {
             throw new UnauthorizedException();
