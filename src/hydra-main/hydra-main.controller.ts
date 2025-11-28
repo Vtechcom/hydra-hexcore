@@ -28,11 +28,12 @@ import { JwtService } from '@nestjs/jwt';
 import { HydraAdminService } from './hydra-admin.service';
 import { AdminAuthGuard } from 'src/auth/admin-auth.guard';
 import { ReqClearPartyDataDto } from './dto/request/clear-party-data.dto';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AddressUtxoDto } from './dto/response/address-utxo.dto';
 
 @ApiTags('Hydra Main Service')
 @Controller('hydra-main')
+@ApiBearerAuth()
 export class HydraMainController {
     constructor(
         private hydraMainService: HydraMainService,

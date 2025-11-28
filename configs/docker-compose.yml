@@ -28,10 +28,7 @@ services:
       # mount socket để ogmios nói chuyện với cardano-node
       - ./cardano:/cardano-node
       # - node-ipc:/cardano-node # Shared volume for socket communication
-    command: [ "--node-socket", "/cardano-node/node.socket", "--node-config", "/config/preprod/cardano-node/config.json", "--host", "0.0.0.0" ]
+    command: [ "--node-socket", "/cardano-node/node.socket", "--node-config", "/cardano-node/config.json", "--host", "0.0.0.0" ]
 
 volumes:
   db:
-    driver: local
-  node-ipc:
-    driver: local

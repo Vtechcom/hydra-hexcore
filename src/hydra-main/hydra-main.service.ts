@@ -121,15 +121,36 @@ export class HydraMainService implements OnModuleInit {
         );
         if (cardanoNodeContainer && cardanoNodeContainer.State !== 'running') {
             console.log('Cardano node is not running');
+            
+            // Ensure hydra-network exists
+            await this.ensureHydraNetwork();
+            
+            // Check if container is connected to hydra-network
+            const containerInfo = await this.docker.getContainer(cardanoNodeContainer.Id).inspect();
+            const isConnectedToHydraNetwork = containerInfo.NetworkSettings.Networks['hydra-network'];
+            
+            if (!isConnectedToHydraNetwork) {
+                console.log('Connecting cardano-node to hydra-network');
+                const hydraNetwork = this.docker.getNetwork('hydra-network');
+                await hydraNetwork.connect({
+                    Container: cardanoNodeContainer.Id
+                });
+            }
+            
             // delete node.socket to restart docker
             await this.docker.getContainer(cardanoNodeContainer.Id).restart();
             this.cardanoNode.container = this.docker.getContainer(cardanoNodeContainer.Id);
         } else if (!cardanoNodeContainer) {
             console.log('Cardano node is not running, try to run cardano-node');
+            
+            // Ensure hydra-network exists before creating cardano-node
+            await this.ensureHydraNetwork();
+
             const container = await this.docker.createContainer({
                 Image: this.CONSTANTS.cardanoNodeImage,
                 name: this.CONSTANTS.cardanoNodeServiceName,
                 HostConfig: {
+                    NetworkMode: 'hydra-network', // Connect to the same network as Hydra nodes
                     Binds: [
                         `${this.CONSTANTS.cardanoNodeFolder}/database:/db`, // Map local ./database to /db
                         `${this.CONSTANTS.cardanoNodeFolder}:/workspace`, // Map local ./ to /workspace
@@ -166,6 +187,9 @@ export class HydraMainService implements OnModuleInit {
             this.cardanoNode.container = container;
         }
         this.cardanoNode.container = this.docker.getContainer(cardanoNodeContainer.Id);
+        
+        // Ensure the cardano-node container is connected to hydra-network (even if already running)
+        await this.ensureCardanoNodeNetworkConnection(cardanoNodeContainer.Id);
         const output = await this.execInContainer(this.CONSTANTS.cardanoNodeServiceName, [
             'cardano-cli',
             'query',
@@ -362,9 +386,11 @@ export class HydraMainService implements OnModuleInit {
     }
 
     async getListHydraNode({ pagination }: { pagination: IPaginationOptions }) {
+        const page = pagination?.page ?? 1;
+        const limit = pagination?.limit ?? 10;
         const nodes = await this.hydraNodeRepository.find({
-            skip: (pagination.page - 1) * pagination.limit,
-            take: pagination.limit,
+            skip: (page - 1) * limit,
+            take: limit,
             relations: {
                 cardanoAccount: true,
             },
@@ -594,6 +620,105 @@ export class HydraMainService implements OnModuleInit {
         return totalLovelace >= this.CONSTANTS.cardanoAccountMinLovelace ? true : false;
     }
 
+    async ensureHydraNetwork(): Promise<void> {
+        const networkName = 'hydra-network';
+        
+        try {
+            // Check if network already exists
+            const networks = await this.docker.listNetworks();
+            const existingNetwork = networks.find(network => network.Name === networkName);
+            
+            if (existingNetwork) {
+                console.log(`Network ${networkName} already exists`);
+                return;
+            }
+            
+            // Create the network if it doesn't exist
+            console.log(`Creating Docker network: ${networkName}`);
+            await this.docker.createNetwork({
+                Name: networkName,
+                Driver: 'bridge',
+                CheckDuplicate: true,
+            });
+            console.log(`Network ${networkName} created successfully`);
+            
+        } catch (error: any) {
+            console.error(`Error ensuring network ${networkName}:`, error.message);
+            throw new Error(`Failed to ensure network ${networkName}: ${error.message}`);
+        }
+    }
+
+    async ensureCardanoNodeNetworkConnection(containerId: string): Promise<void> {
+        try {
+            // Ensure hydra-network exists first
+            await this.ensureHydraNetwork();
+            
+            // Check if container is connected to hydra-network
+            const containerInfo = await this.docker.getContainer(containerId).inspect();
+            const isConnectedToHydraNetwork = containerInfo.NetworkSettings.Networks['hydra-network'];
+            
+            if (!isConnectedToHydraNetwork) {
+                console.log('Connecting cardano-node to hydra-network');
+                const hydraNetwork = this.docker.getNetwork('hydra-network');
+                await hydraNetwork.connect({
+                    Container: containerId
+                });
+                console.log('Cardano-node successfully connected to hydra-network');
+            } else {
+                console.log('Cardano-node is already connected to hydra-network');
+            }
+            
+        } catch (error: any) {
+            console.error(`Error ensuring cardano-node network connection:`, error.message);
+            // Don't throw here as this is not critical for startup
+        }
+    }
+
+    async checkContainerNetworkConnection(containerId: string, networkName: string): Promise<boolean> {
+        try {
+            const containerInfo = await this.docker.getContainer(containerId).inspect();
+            const networkSettings = containerInfo.NetworkSettings.Networks[networkName];
+            return !!(networkSettings && networkSettings.IPAddress);
+        } catch (error) {
+            return false;
+        }
+    }
+
+    async ensureContainerNetworkConnection(containerId: string, networkName: string): Promise<void> {
+        try {
+            // Check if container is properly connected to the network
+            const isInitiallyConnected = await this.checkContainerNetworkConnection(containerId, networkName);
+            
+            if (!isInitiallyConnected) {
+                console.log(`Container ${containerId} not properly connected to ${networkName}, attempting to reconnect...`);
+                
+                const network = this.docker.getNetwork(networkName);
+                
+                // Try to disconnect first (in case it's partially connected)
+                try {
+                    await network.disconnect({ Container: containerId, Force: true });
+                } catch (disconnectError) {
+                    // Ignore disconnect errors
+                }
+                
+                // Reconnect to network
+                await network.connect({
+                    Container: containerId
+                });
+                
+                console.log(`Container ${containerId} successfully reconnected to ${networkName}`);
+            } else {
+                const containerInfo = await this.docker.getContainer(containerId).inspect();
+                const networkSettings = containerInfo.NetworkSettings.Networks[networkName];
+                console.log(`Container ${containerId} is properly connected to ${networkName} with IP: ${networkSettings.IPAddress}`);
+            }
+        } catch (error: any) {
+            console.error(`Error ensuring container network connection:`, error.message);
+            // Don't throw error here to avoid breaking the entire party activation
+            // The container might still work if it gets connected later
+        }
+    }
+
     async activeHydraParty(activePartyDto: ReqActivePartyDto): Promise<ResActivePartyDto> {
         const partyId = activePartyDto.id;
         const party = await this.hydraPartyRepository
@@ -650,151 +775,203 @@ export class HydraMainService implements OnModuleInit {
         protocolParameters.executionUnitPrices.priceSteps = 0;
         await this.writeFile(`${partyDirPath}/protocol-parameters.json`, JSON.stringify(protocolParameters));
 
-        // create docker container for each node
-        for (const node of party.hydraNodes) {
-            const peerNodes = party.hydraNodes.filter(peerNode => peerNode.id !== node.id);
-            const nodeName = this.getDockerContainerName(node);
+        // ensure hydra-network exists before creating containers
+        await this.ensureHydraNetwork();
 
-            const skeyFilePath = `${partyDirPath}/${nodeName}.sk`;
-            const vkeyFilePath = `${partyDirPath}/${nodeName}.vk`;
-            const cardanoSkeyFilePath = `${partyDirPath}/${nodeName}.cardano.sk`;
-            const cardanoVkeyFilePath = `${partyDirPath}/${nodeName}.cardano.vk`;
+        // Track created containers for cleanup on error
+        const createdContainers: Docker.Container[] = [];
 
-            const skey = JSON.parse(node.skey);
-            const vkey = JSON.parse(node.vkey);
-            const cardanoSigningKey = getSigningKeyFromMnemonic(node.cardanoAccount.mnemonic);
-            const cardanoAccount = {
-                skey: cardanoSigningKey,
-                vkey: new PaymentVerificationKey(cardanoSigningKey),
-                pointerAddress: new PaymentVerificationKey(cardanoSigningKey).toPointerAddress(1),
-            };
-            // create credentials files
-            await this.writeFile(skeyFilePath, JSON.stringify(skey, null, 4));
-            await this.writeFile(vkeyFilePath, JSON.stringify(vkey, null, 4));
-            await this.writeFile(cardanoSkeyFilePath, cardanoAccount.skey.toJSON(null, 4));
-            await this.writeFile(cardanoVkeyFilePath, cardanoAccount.vkey.toJSON(null, 4));
+        try {
+            // STEP 1: Create ALL credential files FIRST for all nodes
+            // This ensures peer node files exist before containers try to reference them
+            console.log(`Creating credential files for ${party.hydraNodes.length} nodes...`);
+            for (const node of party.hydraNodes) {
+                const nodeName = this.getDockerContainerName(node);
 
-            // remove container if existed
-            try {
-                const existedContainer = await this.docker.getContainer(nodeName);
-                if (existedContainer) {
-                    if ((await existedContainer.inspect()).State.Running) {
-                        await existedContainer.stop();
-                        console.log(`Container ${nodeName} stopped`);
-                    }
-                    await existedContainer.remove();
-                    console.log(`Container ${nodeName} removed`);
-                }
-            } catch (error: any) {
-                console.error(`Error while removing container: ${nodeName}`, error.message);
+                const skeyFilePath = `${partyDirPath}/${nodeName}.sk`;
+                const vkeyFilePath = `${partyDirPath}/${nodeName}.vk`;
+                const cardanoSkeyFilePath = `${partyDirPath}/${nodeName}.cardano.sk`;
+                const cardanoVkeyFilePath = `${partyDirPath}/${nodeName}.cardano.vk`;
+
+                const skey = JSON.parse(node.skey);
+                const vkey = JSON.parse(node.vkey);
+                const cardanoSigningKey = getSigningKeyFromMnemonic(node.cardanoAccount.mnemonic);
+                const cardanoAccount = {
+                    skey: cardanoSigningKey,
+                    vkey: new PaymentVerificationKey(cardanoSigningKey),
+                    pointerAddress: new PaymentVerificationKey(cardanoSigningKey).toPointerAddress(1),
+                };
+                // create credentials files
+                await this.writeFile(skeyFilePath, JSON.stringify(skey, null, 4));
+                await this.writeFile(vkeyFilePath, JSON.stringify(vkey, null, 4));
+                await this.writeFile(cardanoSkeyFilePath, cardanoAccount.skey.toJSON(null, 4));
+                await this.writeFile(cardanoVkeyFilePath, cardanoAccount.vkey.toJSON(null, 4));
+                console.log(`Created credential files for ${nodeName}`);
             }
 
-            const cleanArg = (str: string | number) =>
-                String(str)
-                    .replace(/[^\x20-\x7E]/g, '')
-                    .trim();
-            /**
-             * NOTE:
-             * - Cập nhật command run node cho Hydra v0.21.0
-             * - Chuyển sang chế độ network custom brigde:
-             * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network`
-             * - Thêm advertise param
-             */
-            /**
-             * NOTE:
-             * - Cập nhật command run node cho Hydra v0.22.2
-             * - Chuyển sang chế độ network custom brigde:
-             * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network`
-             * - Thêm advertise param
-             */
-            const peerNodeParams = peerNodes
-                .map(peerNode => {
-                    const nodeName = this.getDockerContainerName(peerNode);
-                    return [
-                        '--peer',
-                        `${nodeName}:${peerNode.port + 1000}`,
-                        `--hydra-verification-key`,
-                        `/data/party-${party.id}/${nodeName}.vk`,
-                        `--cardano-verification-key`,
-                        `/data/party-${party.id}/${nodeName}.cardano.vk`,
-                    ];
-                })
-                .flat();
-            const container = await this.docker.createContainer({
-                Image: this.CONSTANTS.hydraNodeImage,
-                // eslint-disable-next-line @typescript-eslint/naming-convention
-                // prettier-ignore
-                Cmd: [
-                    '--node-id', `${nodeName}`,
-                    '--listen', `0.0.0.0:${node.port + 1000}`,
-                    '--advertise', `${nodeName}:${node.port + 1000}`, 
-                    '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
-                    '--persistence-dir', `/data${resolvePersistenceDir(party.id, nodeName)}`,
-                    '--api-host', '0.0.0.0',
-                    '--api-port', `${node.port}`,
-                    ...peerNodeParams,
-                    '--cardano-signing-key', `/data/party-${party.id}/${nodeName}.cardano.sk`,
-                    '--hydra-scripts-tx-id', `${this.CONSTANTS.hydraNodeScriptTxId}`,
-                    '--persistence-rotate-after', '15000', // 15_000 seq
+            // STEP 2: Now create containers (all files are ready)
+            console.log(`Creating containers for ${party.hydraNodes.length} nodes...`);
+            for (const node of party.hydraNodes) {
+                const peerNodes = party.hydraNodes.filter(peerNode => peerNode.id !== node.id);
+                const nodeName = this.getDockerContainerName(node);
 
-                    '--deposit-period', `120s`,
-                    '--contestation-period', `60s`,
-                    
-                    '--testnet-magic', `${this.CONSTANTS.hydraNodeNetworkId}`,
-                    '--node-socket', `/cardano-node/node.socket`,
-                    '--ledger-protocol-parameters', `/data/party-${party.id}/protocol-parameters.json`,
-                ],
-                HostConfig: {
-                    NetworkMode: 'hydra-network',
-                    Binds: [
-                        `${this.CONSTANTS.hydraNodeFolder}:/data`,
-                        `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
+                const cleanArg = (str: string | number) =>
+                    String(str)
+                        .replace(/[^\x20-\x7E]/g, '')
+                        .trim();
+                /**
+                 * NOTE:
+                 * - Cập nhật command run node cho Hydra v0.21.0
+                 * - Chuyển sang chế độ network custom brigde:
+                 * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network`
+                 * - Thêm advertise param
+                 */
+                /**
+                 * NOTE:
+                 * - Cập nhật command run node cho Hydra v0.22.2
+                 * - Chuyển sang chế độ network custom brigde:
+                 * - Nếu chưa có custom bridge network: `docker network create --driver bridge hydra-network`
+                 * - Thêm advertise param
+                 */
+                const peerNodeParams = peerNodes
+                    .map(peerNode => {
+                        const nodeName = this.getDockerContainerName(peerNode);
+                        return [
+                            '--peer',
+                            `${nodeName}:${peerNode.port + 1000}`,
+                            `--hydra-verification-key`,
+                            `/data/party-${party.id}/${nodeName}.vk`,
+                            `--cardano-verification-key`,
+                            `/data/party-${party.id}/${nodeName}.cardano.vk`,
+                        ];
+                    })
+                    .flat();
+                const containerConfig: Docker.ContainerCreateOptions = {
+                    Image: this.CONSTANTS.hydraNodeImage,
+                    // eslint-disable-next-line @typescript-eslint/naming-convention
+                    // prettier-ignore
+                    Cmd: [
+                        '--node-id', `${nodeName}`,
+                        '--listen', `0.0.0.0:${node.port + 1000}`,
+                        '--advertise', `${nodeName}:${node.port + 1000}`, 
+                        '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
+                        '--persistence-dir', `/data${resolvePersistenceDir(party.id, nodeName)}`,
+                        '--api-host', '0.0.0.0',
+                        '--api-port', `${node.port}`,
+                        ...peerNodeParams,
+                        '--cardano-signing-key', `/data/party-${party.id}/${nodeName}.cardano.sk`,
+                        // Skip hydra-scripts-tx-id if empty - let Hydra use built-in scripts
+                        ...(this.CONSTANTS.hydraNodeScriptTxId ? ['--hydra-scripts-tx-id', this.CONSTANTS.hydraNodeScriptTxId] : []),
+                        '--persistence-rotate-after', '15000', // 15_000 seq
+
+                        '--deposit-period', `120s`,
+                        '--contestation-period', `60s`,
+                        
+                        '--testnet-magic', `${this.CONSTANTS.hydraNodeNetworkId}`,
+                        '--node-socket', `/cardano-node/node.socket`,
+                        '--ledger-protocol-parameters', `/data/party-${party.id}/protocol-parameters.json`,
                     ],
-                    PortBindings: {
-                        [`${node.port}/tcp`]: [{ HostPort: `${node.port}` }],
-                        [`${node.port + 1000}/tcp`]: [{ HostPort: `${node.port + 1000}` }],
+                    HostConfig: {
+                        NetworkMode: 'hydra-network',
+                        Binds: [
+                            `${this.CONSTANTS.hydraNodeFolder}:/data`,
+                            `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
+                        ],
+                        PortBindings: {
+                            [`${node.port}/tcp`]: [{ HostPort: `${node.port}` }],
+                            [`${node.port + 1000}/tcp`]: [{ HostPort: `${node.port + 1000}` }],
+                        },
                     },
-                },
-                ExposedPorts: {
-                    [`${node.port}/tcp`]: {},
-                    [`${node.port + 1000}/tcp`]: {},
-                },
-                name: nodeName,
-                Labels: {
-                    [this.CONSTANTS.hydraPartyLabel]: party.id.toString(),
-                    [this.CONSTANTS.hydraNodeLabel]: node.id.toString(),
-                },
-                Env: [
-                    'ETCD_AUTO_COMPACTION_MODE=periodic',
-                    'ETCD_AUTO_COMPACTION_RETENTION=168h',
-                    // Giảm nhịp heartbeat, tăng timeout election để hạn chế lease drop
-                    'ETCD_HEARTBEAT_INTERVAL=1000', // 1000ms
-                    'ETCD_ELECTION_TIMEOUT=5000', // 5000ms
-                ],
-                User: `${process.getuid ? process.getuid() : ''}:${process.getgid ? process.getgid() : ''}`,
-            });
-            // @ts-ignore
-            node.container = {
-                id: container.id,
-                name: nodeName,
-                args: (await container.inspect()).Args,
-                image: (await container.inspect()).Config.Image,
-            };
-            await container.start();
-            console.log(`Container ${nodeName} started`);
+                    ExposedPorts: {
+                        [`${node.port}/tcp`]: {},
+                        [`${node.port + 1000}/tcp`]: {},
+                    },
+                    Labels: {
+                        [this.CONSTANTS.hydraPartyLabel]: party.id.toString(),
+                        [this.CONSTANTS.hydraNodeLabel]: node.id.toString(),
+                    },
+                    Env: [
+                        'ETCD_AUTO_COMPACTION_MODE=periodic',
+                        'ETCD_AUTO_COMPACTION_RETENTION=168h',
+                        // Giảm nhịp heartbeat, tăng timeout election để hạn chế lease drop
+                        'ETCD_HEARTBEAT_INTERVAL=1000', // 1000ms
+                        'ETCD_ELECTION_TIMEOUT=5000', // 5000ms
+                    ],
+                    // User: `${process.getuid ? process.getuid() : ''}:${process.getgid ? process.getgid() : ''}`, // Run as root to access socket
+                };
+
+                // Use startOrCreateContainer with retry logic
+                const container = await this.startOrCreateContainer(nodeName, containerConfig, 2);
+                createdContainers.push(container);
+
+                // @ts-ignore
+                node.container = {
+                    id: container.id,
+                    name: nodeName,
+                    args: (await container.inspect()).Args,
+                    image: (await container.inspect()).Config.Image,
+                };
+            }
+
+            // All containers started successfully
+            party.status = 'ACTIVE';
+            await this.hydraPartyRepository.save(party);
+        } catch (error: any) {
+            // If any container fails, cleanup all created containers
+            console.error(`Error activating party ${party.id}:`, error.message);
+            console.log(`Cleaning up ${createdContainers.length} containers due to error...`);
+
+            for (const container of createdContainers) {
+                try {
+                    await this.cleanupContainer(container);
+                } catch (cleanupError) {
+                    console.error(`Error during cleanup:`, cleanupError);
+                }
+            }
+
+            party.status = 'INACTIVE';
+            await this.hydraPartyRepository.save(party);
+
+            throw new BadRequestException(`Failed to activate party: ${error.message}`);
         }
+
         // active GameRoom
         // await this.createGameRoom(party);
-        // party.status = 'ACTIVE';
-        await this.hydraPartyRepository.save(party);
 
-        await Promise.resolve(() => setTimeout(() => {}, 1000));
         // check party active
-        const status = await this.checkPartyActive(party);
+        // const status = await this.checkPartyActive(party);
 
         return {
             ...party,
-            status: status ? 'ACTIVE' : 'INACTIVE',
+            // status: status ? 'ACTIVE' : 'INACTIVE',
+        };
+    }
+
+    /**
+     * Force cleanup all containers for a party (use when containers are in bad state)
+     */
+    async cleanupHydraParty(activePartyDto: ReqActivePartyDto): Promise<ResActivePartyDto> {
+        const partyId = activePartyDto.id;
+        const party = await this.hydraPartyRepository
+            .createQueryBuilder('party')
+            .where('party.id = :id', { id: partyId })
+            .leftJoinAndSelect('party.hydraNodes', 'hydraNodes')
+            .leftJoinAndSelect('hydraNodes.cardanoAccount', 'cardanoAccount')
+            .getOne();
+
+        if (!party) {
+            throw new BadRequestException('Invalid Party Id');
+        }
+
+        console.log(`[cleanupHydraParty]: Force cleaning up all containers for party ${partyId}`);
+        await this.cleanupPartyContainers(party);
+
+        party.status = 'INACTIVE';
+        await this.hydraPartyRepository.save(party);
+        await this.updateHydraContainerStatus();
+
+        return {
+            ...party,
         };
     }
 
@@ -813,32 +990,33 @@ export class HydraMainService implements OnModuleInit {
         // if (party.status === 'INACTIVE') {
         //     throw new BadRequestException('Party is already inactive');
         // }
+        // Stop all containers for this party (don't remove, keep for reuse)
         for (const node of party.hydraNodes) {
             const nodeName = this.getDockerContainerName(node);
             try {
-                const container = await this.docker.getContainer(nodeName);
+                const container = await this.getContainerIfExists(nodeName);
                 if (container) {
-                    if ((await container.inspect()).State.Running) {
-                        await container.stop();
-                        console.log(`[deactiveHydraParty]: Container ${nodeName} stopped`);
-                    }
-                    await container.remove();
-                    console.log(`[deactiveHydraParty]: Container ${nodeName} removed`);
+                    await this.stopContainer(container);
+                    console.log(`[deactiveHydraParty]: Container ${nodeName} stopped`);
+                } else {
+                    console.log(`[deactiveHydraParty]: Container ${nodeName} not found, already inactive`);
                 }
             } catch (error: any) {
-                console.error(`Error while removing container: ${nodeName}`, error.message);
+                console.error(`Error while stopping container: ${nodeName}`, error.message);
+                // Continue with other containers even if one fails
             }
         }
-        await Promise.resolve(() => setTimeout(() => {}, 1000));
+
+        party.status = 'INACTIVE';
         await this.hydraPartyRepository.save(party);
         await this.updateHydraContainerStatus();
 
         // check party active
-        const status = await this.checkPartyActive(party);
+        // const status = await this.checkPartyActive(party);
 
         return {
             ...party,
-            status: status ? 'ACTIVE' : 'INACTIVE',
+            // status: status ? 'ACTIVE' : 'INACTIVE',
         };
     }
 
@@ -939,6 +1117,149 @@ export class HydraMainService implements OnModuleInit {
 
     getDockerContainerName(hydraNode: HydraNode) {
         return resolveHydraNodeName(hydraNode.id);
+    }
+
+    /**
+     * Get container if exists, return null if not found
+     */
+    async getContainerIfExists(containerName: string): Promise<Docker.Container | null> {
+        try {
+            const container = this.docker.getContainer(containerName);
+            await container.inspect(); // Verify container exists
+            return container;
+        } catch (error: any) {
+            if (error.statusCode === 404) {
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Stop container if running
+     */
+    async stopContainer(container: Docker.Container): Promise<void> {
+        try {
+            const state = await container.inspect();
+            if (state.State.Running) {
+                await container.stop();
+                console.log(`Container ${state.Name} stopped`);
+            }
+        } catch (error: any) {
+            console.error(`Error stopping container:`, error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Start container if exists, create if not
+     */
+    async startOrCreateContainer(
+        nodeName: string,
+        containerConfig: Docker.ContainerCreateOptions,
+        retryCount = 2,
+    ): Promise<Docker.Container> {
+        let container: Docker.Container | null = null;
+        let lastError: Error | null = null;
+
+        for (let attempt = 0; attempt <= retryCount; attempt++) {
+            try {
+                // Try to get existing container
+                container = await this.getContainerIfExists(nodeName);
+
+                if (container) {
+                    // Container exists, check state
+                    const state = await container.inspect();
+                    if (state.State.Running) {
+                        console.log(`Container ${nodeName} is already running`);
+                        return container;
+                    }
+
+                    // Container exists but not running, start it
+                    console.log(`Starting existing container ${nodeName}...`);
+                    await container.start();
+                    console.log(`Container ${nodeName} started successfully`);
+                    return container;
+                } else {
+                    // Container doesn't exist, create new one
+                    if (attempt === 0) {
+                        console.log(`Creating new container ${nodeName}...`);
+                    } else {
+                        console.log(`Retry ${attempt}: Creating new container ${nodeName}...`);
+                    }
+
+                    container = await this.docker.createContainer({
+                        ...containerConfig,
+                        name: nodeName,
+                    });
+
+                    await container.start();
+                    console.log(`Container ${nodeName} created and started successfully`);
+                    return container;
+                }
+            } catch (error: any) {
+                lastError = error;
+                console.error(`Attempt ${attempt + 1} failed for container ${nodeName}:`, error.message);
+
+                // Cleanup on error (except last attempt)
+                if (attempt < retryCount && container) {
+                    try {
+                        await this.cleanupContainer(container);
+                        console.log(`Cleaned up container ${nodeName} after error`);
+                    } catch (cleanupError) {
+                        console.error(`Error during cleanup:`, cleanupError);
+                    }
+                }
+
+                // Wait before retry
+                if (attempt < retryCount) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
+        }
+
+        // All attempts failed
+        throw new Error(`Failed to start/create container ${nodeName} after ${retryCount + 1} attempts: ${lastError?.message}`);
+    }
+
+    /**
+     * Cleanup container (stop and remove)
+     */
+    async cleanupContainer(container: Docker.Container): Promise<void> {
+        try {
+            const state = await container.inspect();
+            if (state.State.Running) {
+                await container.stop();
+            }
+            await container.remove();
+            console.log(`Container ${state.Name} cleaned up (stopped and removed)`);
+        } catch (error: any) {
+            if (error.statusCode !== 404) {
+                console.error(`Error cleaning up container:`, error.message);
+                throw error;
+            }
+        }
+    }
+
+    /**
+     * Cleanup all containers for a party
+     */
+    async cleanupPartyContainers(party: HydraParty): Promise<void> {
+        const errors: string[] = [];
+        for (const node of party.hydraNodes) {
+            const nodeName = this.getDockerContainerName(node);
+            try {
+                const container = await this.getContainerIfExists(nodeName);
+                if (container) {
+                    await this.cleanupContainer(container);
+                }
+            } catch (error: any) {
+                errors.push(`Failed to cleanup ${nodeName}: ${error.message}`);
+            }
+        }
+        if (errors.length > 0) {
+            console.error('Errors during party cleanup:', errors);
+        }
     }
 
     async commitToHydraNode(commitHydraDto: CommitHydraDto) {

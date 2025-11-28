@@ -21,8 +21,7 @@ services:
     restart: on-failure
     ports:
       - 6327:6379
-    environment:
-      REDIS_PASSWORD: redispassword
+    command: ["redis-server", "--requirepass", "redispassword"]
 
 volumes:
   mysql-data:
