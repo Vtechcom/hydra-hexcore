@@ -20,7 +20,7 @@ export class HydraAdminService {
         if (user.password !== loginDto.password) {
             throw new UnauthorizedException('Invalid credentials');
         }
-        const payload = { username: user.username, sub: user.id, role: user.role };
+        const payload = { username: user.username, id: user.id, role: user.role };
         return {
             accessToken: await this.jwtService.signAsync(payload),
         };

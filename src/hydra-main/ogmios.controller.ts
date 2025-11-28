@@ -1,5 +1,5 @@
 import { ClassSerializerInterceptor, Controller, Get, Param, Query, UseInterceptors } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiProperty } from '@nestjs/swagger';
 import { OgmiosClientService } from './ogmios-client.service';
 import { BigIntInterceptor, SimpleBigIntInterceptor } from '../common/interceptors/bigint.interceptor';
 import { ProtocolParametersDto, BigIntResponseDto, HealthResponseDto } from '../dto/ogmios.dto';
@@ -76,6 +76,14 @@ export class OgmiosController {
         description: 'UTxO set',
         type: Object, // Define the UTxO set response type
     })
+    @ApiQuery({
+        name: 'addresses',
+        required: true,
+        type: [String],
+        description: 'Cardano address(es) to query UTxO. Can be a single address or multiple addresses as array.',
+        example: 'addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnjhl2hx3vx0j4w0q3q8qy8q',
+        isArray: true,
+    })
     async queryUtxoByAddresses(@Query('addresses') addresses: string[] | string) {
         // If a single address is provided as a string, convert it to an array
         const addressArray = Array.isArray(addresses) ? addresses : [addresses];
@@ -115,7 +123,9 @@ export class OgmiosController {
         description: 'Transaction details',
         type: Object, // Define the transaction response type
     })
-    async queryTransactions(@Query('txHashes') txHashes: `${string}#${number}`[]) {
-        return await this.ogmiosClientService.queryUtxo({ txHashes });
+    async queryTransactions(@Query('txHashes') txHashes: `${string}#${number}`[] | `${string}#${number}`) {
+        // Ensure txHashes is always an array
+        const txHashesArray = Array.isArray(txHashes) ? txHashes : txHashes ? [txHashes] : [];
+        return await this.ogmiosClientService.queryUtxo({ txHashes: txHashesArray });
     }
 }

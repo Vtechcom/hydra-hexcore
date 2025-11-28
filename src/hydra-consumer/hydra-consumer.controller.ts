@@ -20,6 +20,7 @@ import { AdminAuthGuard } from 'src/auth/admin-auth.guard';
 import { ConsumerLoginDto } from './dto/consumer-login.dto';
 import { ShareConsumerNodeDto } from './dto/share-consumer-node.dto';
 import { RemoveConsumerNodeDto } from './dto/remove-consumer-node.dto';
+import { ApiBearerAuth } from '@nestjs/swagger';
 @Controller('hydra-consumer')
 export class HydraConsumerController {
     constructor(private readonly hydraConsumerService: HydraConsumerService) {}
@@ -36,6 +37,7 @@ export class HydraConsumerController {
     }
 
     @UseGuards(AdminAuthGuard)
+    @ApiBearerAuth()
     @UseInterceptors(ClassSerializerInterceptor)
     @Get('admin/list-consumers')
     listConsumers(@Query() query: QueryConsumersDto) {
@@ -43,6 +45,7 @@ export class HydraConsumerController {
     }
 
     @UseGuards(AdminAuthGuard)
+    @ApiBearerAuth()
     @UseInterceptors(ClassSerializerInterceptor)
     @Put('admin/update-consumer')
     updateConsumer(@Body() updateConsumerDto: UpdateConsumerDto) {
@@ -50,6 +53,7 @@ export class HydraConsumerController {
     }
 
     @UseGuards(AdminAuthGuard)
+    @ApiBearerAuth()
     @UseInterceptors(ClassSerializerInterceptor)
     @Post('admin/share-consumer-node')
     shareConsumerNode(@Body() shareConsumerNodeDto: ShareConsumerNodeDto) {
@@ -57,6 +61,7 @@ export class HydraConsumerController {
     }
 
     @UseGuards(AdminAuthGuard)
+    @ApiBearerAuth()
     @UseInterceptors(ClassSerializerInterceptor)
     @Post('admin/remove-shared-node')
     removeSharedNode(@Body() removeConsumerNodeDto: RemoveConsumerNodeDto) {
@@ -64,6 +69,7 @@ export class HydraConsumerController {
     }
 
     @UseGuards(AdminAuthGuard)
+    @ApiBearerAuth()
     @UseInterceptors(ClassSerializerInterceptor)
     @Get('admin/consumer/:id')
     getConsumerInfoById(@Param('id') id: string) {
@@ -73,6 +79,7 @@ export class HydraConsumerController {
     // Consumer
 
     @UseGuards(ConsumerAuthGuard)
+    @ApiBearerAuth()
     @UseInterceptors(ClassSerializerInterceptor)
     @Get('consumer/info')
     getConsumerInfo(@Req() req: any) {
@@ -80,6 +87,7 @@ export class HydraConsumerController {
     }
 
     @UseGuards(ConsumerAuthGuard)
+    @ApiBearerAuth()
     @UseInterceptors(ClassSerializerInterceptor)
     @Get('consumer/authorization')
     authorization(@Req() req: any) {
@@ -92,6 +100,7 @@ export class HydraConsumerController {
     }
 
     @UseGuards(ConsumerAuthGuard)
+    @ApiBearerAuth()
     @UseInterceptors(ClassSerializerInterceptor)
     @Get('consumer/owned-nodes')
     getOwnedNodes(@Req() req: any) {

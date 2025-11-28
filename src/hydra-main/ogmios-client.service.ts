@@ -202,7 +202,9 @@ export class OgmiosClientService implements OnModuleInit, OnModuleDestroy {
                 throw new Error('At least one of address or txHash must be provided');
             }
 
-            const outputReferences = (txHashes || []).map(txHash => {
+            // Ensure txHashes is always an array
+            const txHashesArray = Array.isArray(txHashes) ? txHashes : txHashes ? [txHashes] : [];
+            const outputReferences = txHashesArray.map(txHash => {
                 const [txId, indexStr] = txHash.split('#');
                 const index = parseInt(indexStr, 10);
                 if (isNaN(index)) {
