@@ -6,9 +6,13 @@ import { SwaggerModule } from '@nestjs/swagger';
 import { swaggerConfig } from './config/swagger.config';
 import { ResolvePromisesInterceptor } from './common/interceptors/serializer.interceptor';
 import { BigIntInterceptor } from './common/interceptors/bigint.interceptor';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 async function bootstrap() {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, {
+        bufferLogs: true,
+    });
+    app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
     app.enableCors({
         origin: '*',
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',

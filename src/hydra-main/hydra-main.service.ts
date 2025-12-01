@@ -37,7 +37,6 @@ import { resolveHydraNodeName } from './utils/name-resolver';
 import { OgmiosClientService } from './ogmios-client.service';
 import { convertUtxoToUTxOObject } from './utils/ogmios-converter';
 import { convertBigIntToString } from 'src/utils/bigint.utils';
-import { FileLoggerService } from 'src/utils/file-logger.service';
 
 type ContainerNode = {
     hydraNodeId: string;
@@ -107,7 +106,6 @@ export class HydraMainService implements OnModuleInit {
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
         private ogmiosClientService: OgmiosClientService,
-        private fileLogger: FileLoggerService,
     ) {
         const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
         this.docker = new Docker({ socketPath: DOCKER_SOCKET });
@@ -731,7 +729,7 @@ export class HydraMainService implements OnModuleInit {
             .getOne();
 
         if (!party) {
-            this.fileLogger.error('Invalid Party Id', 'HydraMainService');
+            this.logger.error('Invalid Party Id');
             throw new BadRequestException('Invalid Party Id');
         }
         // if (party.status === 'ACTIVE') {
@@ -740,7 +738,7 @@ export class HydraMainService implements OnModuleInit {
         for (const node of party.hydraNodes) {
             const check = await this.checkUtxoAccount(node.cardanoAccount);
             if (!check) {
-                this.fileLogger.error(node.cardanoAccount.pointerAddress + ' not enough lovelace', 'HydraMainService');
+                this.logger.error(node.cardanoAccount.pointerAddress + ' not enough lovelace');
                 throw new BadRequestException(node.cardanoAccount.pointerAddress + ' not enough lovelace');
             }
         }
@@ -751,7 +749,7 @@ export class HydraMainService implements OnModuleInit {
         try {
             await access(partyDirPath, constants.R_OK | constants.W_OK);
         } catch (error: any) {
-            this.fileLogger.error(`Error while accessing party dir: ${partyDirPath}`, error.message, 'HydraMainService');
+            this.logger.error(`Error while accessing party dir: ${partyDirPath} - ${error.message}`);
             await mkdir(partyDirPath, { recursive: true });
             await chmodSync(partyDirPath, 0o775); // RWX cho owner & group
         }
@@ -831,7 +829,7 @@ export class HydraMainService implements OnModuleInit {
                         console.log(`Container ${nodeName} removed`);
                     }
                 } catch (error: any) {
-                    this.fileLogger.error(`Error while removing container: ${nodeName}`, error.message, 'HydraMainService');
+                    this.logger.error(`Error while removing container: ${nodeName} - ${error.message}`);
                 }
 
                 const cleanArg = (str: string | number) =>
@@ -937,14 +935,14 @@ export class HydraMainService implements OnModuleInit {
             await this.hydraPartyRepository.save(party);
         } catch (error: any) {
             // If any container fails, cleanup all created containers
-            this.fileLogger.error(`Error activating party ${party.id}:`, error.message, 'HydraMainService');
-            this.fileLogger.log(`Cleaning up ${createdContainers.length} containers due to error...`, 'HydraMainService');
+            this.logger.error(`Error activating party ${party.id}: ${error.message}`);
+            this.logger.log(`Cleaning up ${createdContainers.length} containers due to error...`);
 
             for (const container of createdContainers) {
                 try {
                     await this.cleanupContainer(container);
                 } catch (cleanupError) {
-                    this.fileLogger.error(`Error during cleanup:`, cleanupError.message, 'HydraMainService');
+                    this.logger.error(`Error during cleanup: ${cleanupError.message}`);
                 }
             }
 
