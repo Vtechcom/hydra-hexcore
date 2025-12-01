@@ -11,8 +11,12 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { createKeyv, Keyv } from '@keyv/redis';
 import { CacheableMemory } from 'cacheable';
 import { HydraConsumerModule } from './hydra-consumer/hydra-consumer.module';
+import { WinstonModule } from 'nest-winston';
+import { winstonConfig } from './config/winston.config';
+
 @Module({
     imports: [
+        WinstonModule.forRoot(winstonConfig),
         ConfigModule.forRoot({
             envFilePath: '.env',
             load: [configuration],
