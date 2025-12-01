@@ -139,6 +139,7 @@ export class HydraMainController {
         return this.hydraMainService.activeHydraParty(activePartyDto);
     }
 
+    @UseGuards(AdminAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
     @Post('deactive-party')
     deactiveHydraParty(@Body() deactivePartyDto: ReqActivePartyDto) {

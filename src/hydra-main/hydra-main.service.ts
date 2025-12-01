@@ -37,6 +37,7 @@ import { resolveHydraNodeName } from './utils/name-resolver';
 import { OgmiosClientService } from './ogmios-client.service';
 import { convertUtxoToUTxOObject } from './utils/ogmios-converter';
 import { convertBigIntToString } from 'src/utils/bigint.utils';
+import { FileLoggerService } from 'src/utils/file-logger.service';
 
 type ContainerNode = {
     hydraNodeId: string;
@@ -106,6 +107,7 @@ export class HydraMainService implements OnModuleInit {
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
         private ogmiosClientService: OgmiosClientService,
+        private fileLogger: FileLoggerService,
     ) {
         const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
         this.docker = new Docker({ socketPath: DOCKER_SOCKET });
@@ -729,6 +731,7 @@ export class HydraMainService implements OnModuleInit {
             .getOne();
 
         if (!party) {
+            this.fileLogger.error('Invalid Party Id', 'HydraMainService');
             throw new BadRequestException('Invalid Party Id');
         }
         // if (party.status === 'ACTIVE') {
@@ -737,6 +740,7 @@ export class HydraMainService implements OnModuleInit {
         for (const node of party.hydraNodes) {
             const check = await this.checkUtxoAccount(node.cardanoAccount);
             if (!check) {
+                this.fileLogger.error(node.cardanoAccount.pointerAddress + ' not enough lovelace', 'HydraMainService');
                 throw new BadRequestException(node.cardanoAccount.pointerAddress + ' not enough lovelace');
             }
         }
@@ -747,7 +751,7 @@ export class HydraMainService implements OnModuleInit {
         try {
             await access(partyDirPath, constants.R_OK | constants.W_OK);
         } catch (error: any) {
-            console.error(`Error while accessing party dir: ${partyDirPath}`, error.message);
+            this.fileLogger.error(`Error while accessing party dir: ${partyDirPath}`, error.message, 'HydraMainService');
             await mkdir(partyDirPath, { recursive: true });
             await chmodSync(partyDirPath, 0o775); // RWX cho owner & group
         }
@@ -814,6 +818,21 @@ export class HydraMainService implements OnModuleInit {
             for (const node of party.hydraNodes) {
                 const peerNodes = party.hydraNodes.filter(peerNode => peerNode.id !== node.id);
                 const nodeName = this.getDockerContainerName(node);
+
+                // remove container if existed
+                try {
+                    const existedContainer = await this.docker.getContainer(nodeName);
+                    if (existedContainer) {
+                        if ((await existedContainer.inspect()).State.Running) {
+                            await existedContainer.stop();
+                            console.log(`Container ${nodeName} stopped`);
+                        }
+                        await existedContainer.remove();
+                        console.log(`Container ${nodeName} removed`);
+                    }
+                } catch (error: any) {
+                    this.fileLogger.error(`Error while removing container: ${nodeName}`, error.message, 'HydraMainService');
+                }
 
                 const cleanArg = (str: string | number) =>
                     String(str)
@@ -900,8 +919,8 @@ export class HydraMainService implements OnModuleInit {
                     // User: `${process.getuid ? process.getuid() : ''}:${process.getgid ? process.getgid() : ''}`, // Run as root to access socket
                 };
 
-                // Use startOrCreateContainer with retry logic
-                const container = await this.startOrCreateContainer(nodeName, containerConfig, 2);
+                // Use createContainer with retry logic
+                const container = await this.createContainer(nodeName, containerConfig, 2);
                 createdContainers.push(container);
 
                 // @ts-ignore
@@ -918,14 +937,14 @@ export class HydraMainService implements OnModuleInit {
             await this.hydraPartyRepository.save(party);
         } catch (error: any) {
             // If any container fails, cleanup all created containers
-            console.error(`Error activating party ${party.id}:`, error.message);
-            console.log(`Cleaning up ${createdContainers.length} containers due to error...`);
+            this.fileLogger.error(`Error activating party ${party.id}:`, error.message, 'HydraMainService');
+            this.fileLogger.log(`Cleaning up ${createdContainers.length} containers due to error...`, 'HydraMainService');
 
             for (const container of createdContainers) {
                 try {
                     await this.cleanupContainer(container);
                 } catch (cleanupError) {
-                    console.error(`Error during cleanup:`, cleanupError);
+                    this.fileLogger.error(`Error during cleanup:`, cleanupError.message, 'HydraMainService');
                 }
             }
 
@@ -994,16 +1013,17 @@ export class HydraMainService implements OnModuleInit {
         for (const node of party.hydraNodes) {
             const nodeName = this.getDockerContainerName(node);
             try {
-                const container = await this.getContainerIfExists(nodeName);
+                const container = await this.docker.getContainer(nodeName);
                 if (container) {
-                    await this.stopContainer(container);
-                    console.log(`[deactiveHydraParty]: Container ${nodeName} stopped`);
-                } else {
-                    console.log(`[deactiveHydraParty]: Container ${nodeName} not found, already inactive`);
+                    if ((await container.inspect()).State.Running) {
+                        await container.stop();
+                        console.log(`[deactiveHydraParty]: Container ${nodeName} stopped`);
+                    }
+                    await container.remove();
+                    console.log(`[deactiveHydraParty]: Container ${nodeName} removed`);
                 }
             } catch (error: any) {
-                console.error(`Error while stopping container: ${nodeName}`, error.message);
-                // Continue with other containers even if one fails
+                console.error(`Error while removing container: ${nodeName}`, error.message);
             }
         }
 
@@ -1154,7 +1174,7 @@ export class HydraMainService implements OnModuleInit {
     /**
      * Start container if exists, create if not
      */
-    async startOrCreateContainer(
+    async createContainer(
         nodeName: string,
         containerConfig: Docker.ContainerCreateOptions,
         retryCount = 2,
@@ -1164,39 +1184,21 @@ export class HydraMainService implements OnModuleInit {
 
         for (let attempt = 0; attempt <= retryCount; attempt++) {
             try {
-                // Try to get existing container
-                container = await this.getContainerIfExists(nodeName);
-
-                if (container) {
-                    // Container exists, check state
-                    const state = await container.inspect();
-                    if (state.State.Running) {
-                        console.log(`Container ${nodeName} is already running`);
-                        return container;
-                    }
-
-                    // Container exists but not running, start it
-                    console.log(`Starting existing container ${nodeName}...`);
-                    await container.start();
-                    console.log(`Container ${nodeName} started successfully`);
-                    return container;
+                // Container doesn't exist, create new one
+                if (attempt === 0) {
+                    console.log(`Creating new container ${nodeName}...`);
                 } else {
-                    // Container doesn't exist, create new one
-                    if (attempt === 0) {
-                        console.log(`Creating new container ${nodeName}...`);
-                    } else {
-                        console.log(`Retry ${attempt}: Creating new container ${nodeName}...`);
-                    }
-
-                    container = await this.docker.createContainer({
-                        ...containerConfig,
-                        name: nodeName,
-                    });
-
-                    await container.start();
-                    console.log(`Container ${nodeName} created and started successfully`);
-                    return container;
+                    console.log(`Retry ${attempt}: Creating new container ${nodeName}...`);
                 }
+
+                container = await this.docker.createContainer({
+                    ...containerConfig,
+                    name: nodeName,
+                });
+
+                await container.start();
+                console.log(`Container ${nodeName} created and started successfully`);
+                return container;
             } catch (error: any) {
                 lastError = error;
                 console.error(`Attempt ${attempt + 1} failed for container ${nodeName}:`, error.message);

@@ -11,8 +11,11 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { createKeyv, Keyv } from '@keyv/redis';
 import { CacheableMemory } from 'cacheable';
 import { HydraConsumerModule } from './hydra-consumer/hydra-consumer.module';
+import { FileLoggerModule } from './utils/file-logger.module';
+
 @Module({
     imports: [
+        FileLoggerModule,
         ConfigModule.forRoot({
             envFilePath: '.env',
             load: [configuration],
