@@ -1,5 +1,4 @@
 import { DataSource } from "typeorm";
-import { add } from "winston";
 
 export const StatusConsumerType = {
     ACTIVE: 'ACTIVE',
@@ -46,6 +45,28 @@ export async function insertConsumerAccount(data: { address: string; password: s
     await consumerRepository.save(consumer);
 }
 
+export async function insertAccount(mnemonic: string, dataSource: DataSource) {
+    const accountRepository = dataSource.getRepository('Account');
+    const account = accountRepository.create({
+        baseAddress: `addr_test_base_${Date.now()}`,
+        pointerAddress: `addr_test_pointer_${Date.now()}`,
+        mnemonic: mnemonic,
+    });
+    return await accountRepository.save(account);
+}
+
+export async function insertHydraNode(accountId: number, description: string, dataSource: DataSource) {
+    const hydraNodeRepository = dataSource.getRepository('HydraNode');
+    const hydraNode = hydraNodeRepository.create({
+        description: description,
+        port: 5000 + Math.floor(Math.random() * 1000),
+        skey: `skey_${Date.now()}`,
+        vkey: `vkey_${Date.now()}`,
+        cardanoAccount: { id: accountId },
+    });
+    return await hydraNodeRepository.save(hydraNode);
+}
+
 export async function clearDatabase(dataSource: DataSource) {
     if (!dataSource || !dataSource.isInitialized) {
         console.warn('DataSource is not initialized, skipping database cleanup');
@@ -54,8 +75,19 @@ export async function clearDatabase(dataSource: DataSource) {
 
     const entities = dataSource.entityMetadatas;
 
+    // Disable foreign key checks before clearing
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
+
+    // Clear all tables
     for (const entity of entities) {
         const repository = dataSource.getRepository(entity.name);
-        await repository.clear();
+        try {
+            await repository.query(`DELETE FROM \`${entity.tableName}\``);
+        } catch (error) {
+            console.warn(`Failed to clear ${entity.tableName}:`, error.message);
+        }
     }
+
+    // Re-enable foreign key checks
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 }
