@@ -10,7 +10,6 @@ import configuration from './config/configuration';
 import { CacheModule } from '@nestjs/cache-manager';
 import { createKeyv, Keyv } from '@keyv/redis';
 import { CacheableMemory } from 'cacheable';
-import { HydraConsumerModule } from './hydra-consumer/hydra-consumer.module';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './config/winston.config';
 
@@ -48,7 +47,6 @@ import { winstonConfig } from './config/winston.config';
             }),
             inject: [ConfigService],
         }),
-        HydraConsumerModule,
     ],
     controllers: [AppController],
     providers: [AppService],
