@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ArrayNotEmpty, IsArray, IsNumber, IsString } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreatePartyDto {
   @ApiProperty({ description: 'Number of nodes for the party', example: 1 })
@@ -8,6 +8,7 @@ export class CreatePartyDto {
 
   @ApiProperty({ description: 'Description of the party', example: 'Test Party' })
   @IsString()
+  @IsOptional()
   description?: string;
 
   @ApiProperty({ description: 'List of Cardano Account IDs', example: [1] })
