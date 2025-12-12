@@ -2,7 +2,9 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
-
+import { OgmiosClientService } from 'src/hydra-main/ogmios-client.service';
+import { HydraMainService } from 'src/hydra-main/hydra-main.service';
+import { MockOgmiosService } from './mocks/ogmios.mock';
 
 /**
  * Setup shared test application (Full App)
@@ -28,11 +30,29 @@ export async function createTestApp(): Promise<{
         username: process.env.DB_USERNAME,
     });
 
+    // Create simple in-memory cache to avoid Redis connection issues in tests
+    const inMemoryCache = new Map();
+    const mockCacheManager = {
+        get: async (key: string) => inMemoryCache.get(key),
+        set: async (key: string, value: any) => inMemoryCache.set(key, value),
+        del: async (key: string) => inMemoryCache.delete(key),
+        reset: async () => inMemoryCache.clear(),
+    };
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [AppModule],
-    }).compile();
+    })
+        .overrideProvider(OgmiosClientService)
+        .useClass(MockOgmiosService)
+        .overrideProvider('CACHE_MANAGER')
+        .useValue(mockCacheManager)
+        .compile();
 
     const app = moduleFixture.createNestApplication();
+
+    // Mock HydraMainService.onModuleInit to prevent Docker initialization in tests
+    const hydraMainService = moduleFixture.get<HydraMainService>(HydraMainService);
+    jest.spyOn(hydraMainService, 'onModuleInit').mockResolvedValue(undefined);
 
     // Apply global pipes (giống main.ts)
     app.useGlobalPipes(

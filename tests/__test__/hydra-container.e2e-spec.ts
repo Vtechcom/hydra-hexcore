@@ -30,7 +30,8 @@ describe('Hydra Node Containers (e2e)', () => {
 
         const loginResponse = await request(app.getHttpServer()).post('/hydra-main/login').send(adminDto).expect(201);
 
-        adminToken = loginResponse.body.accessToken;
+        // Handle both wrapped (with interceptor) and unwrapped response
+        adminToken = loginResponse.body.data?.accessToken || loginResponse.body.accessToken;
 
         // Tạo test account
         const mnemonic = generateMnemonic(128);
@@ -97,15 +98,18 @@ describe('Hydra Node Containers (e2e)', () => {
             const response = await request(app.getHttpServer()).get('/hydra-main/active-nodes');
 
             expect(response.status).toBe(200);
-            expect(response.body).toEqual(fakeActiveNodes);
-            expect(response.body.length).toBe(2);
-            expect(response.body[0]).toHaveProperty('hydraNodeId');
-            expect(response.body[0]).toHaveProperty('hydraPartyId');
-            expect(response.body[0]).toHaveProperty('container');
-            expect(response.body[0]).toHaveProperty('isActive');
-            expect(response.body[0].container).toHaveProperty('Id');
-            expect(response.body[0].container).toHaveProperty('Names');
-            expect(response.body[0].container).toHaveProperty('State');
+
+            // Handle both wrapped and unwrapped response
+            const activeNodes = response.body.data || response.body;
+            expect(activeNodes).toEqual(fakeActiveNodes);
+            expect(activeNodes.length).toBe(2);
+            expect(activeNodes[0]).toHaveProperty('hydraNodeId');
+            expect(activeNodes[0]).toHaveProperty('hydraPartyId');
+            expect(activeNodes[0]).toHaveProperty('container');
+            expect(activeNodes[0]).toHaveProperty('isActive');
+            expect(activeNodes[0].container).toHaveProperty('Id');
+            expect(activeNodes[0].container).toHaveProperty('Names');
+            expect(activeNodes[0].container).toHaveProperty('State');
         });
     });
 
@@ -133,7 +137,8 @@ describe('Hydra Node Containers (e2e)', () => {
         it('should handle cache updates correctly', async () => {
             // Initial state: empty
             let response = await request(app.getHttpServer()).get('/hydra-main/active-nodes');
-            expect(response.body).toEqual([]);
+            const initialData = response.body.data || response.body;
+            expect(initialData).toEqual([]);
 
             // Update cache with 1 node
             await cacheManager.set('activeNodes', [
@@ -141,7 +146,8 @@ describe('Hydra Node Containers (e2e)', () => {
             ]);
 
             response = await request(app.getHttpServer()).get('/hydra-main/active-nodes');
-            expect(response.body.length).toBe(1);
+            const updatedData1 = response.body.data || response.body;
+            expect(updatedData1.length).toBe(1);
 
             // Update cache with 2 nodes
             await cacheManager.set('activeNodes', [
@@ -150,7 +156,8 @@ describe('Hydra Node Containers (e2e)', () => {
             ]);
 
             response = await request(app.getHttpServer()).get('/hydra-main/active-nodes');
-            expect(response.body.length).toBe(2);
+            const updatedData2 = response.body.data || response.body;
+            expect(updatedData2.length).toBe(2);
         });
     });
 
@@ -186,7 +193,8 @@ describe('Hydra Node Containers (e2e)', () => {
             const duration = Date.now() - startTime;
 
             expect(response.status).toBe(200);
-            expect(response.body.length).toBe(100);
+            const activeNodes = response.body.data || response.body;
+            expect(activeNodes.length).toBe(100);
             expect(duration).toBeLessThan(1000); // Still fast even with 100 nodes
         });
     });

@@ -1,0 +1,19 @@
+
+services:
+  mysql-test:
+    image: mysql:8.0
+    container_name: hexcore-test-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: hexcore_test_db
+      MYSQL_USER: hexcore_user
+      MYSQL_PASSWORD: hexcore_password
+    ports:
+      - "3328:3306"
+    tmpfs:
+      - /var/lib/mysql  # Use tmpfs for fast test database (data is lost on restart)
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
