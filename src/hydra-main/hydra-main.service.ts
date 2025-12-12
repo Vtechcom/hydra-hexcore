@@ -394,10 +394,12 @@ export class HydraMainService implements OnModuleInit {
                 cardanoAccount: true,
             },
         });
-        const activeNodes = await this.getActiveNodeContainers();
         if (!node) {
             throw new BadRequestException('Invalid Hydra Node Id');
         }
+        // remove sensitive key only when node exists
+        delete node.skey;
+        const activeNodes = await this.getActiveNodeContainers();
         const containerNode = activeNodes.find(item => item.hydraNodeId === node.id.toString());
         return {
             ...node,
@@ -424,6 +426,7 @@ export class HydraMainService implements OnModuleInit {
         newHydraNode.vkey = vkey;
         newHydraNode.port = await this.genValidPort();
         const result = await this.hydraNodeRepository.save(newHydraNode);
+        delete result.skey;
         return result;
     }
 

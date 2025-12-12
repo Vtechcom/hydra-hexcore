@@ -1,0 +1,292 @@
+name: E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - unit-test
+  pull_request:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+  checks: write
+  pull-requests: write
+  pages: write
+  id-token: write
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: hexcore_test_db
+          MYSQL_USER: hexcore_user
+          MYSQL_PASSWORD: hexcore_password
+        ports:
+          - 3328:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    
+    strategy:
+      matrix:
+        node-version: [22.16.0]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -P 3328 -u hexcore_user -phexcore_password --silent; then
+              echo "MySQL is ready!"
+              break
+            fi
+            echo "Waiting for MySQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run E2E tests
+        run: pnpm test:e2e:ci
+        env:
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3328
+          DB_USERNAME: hexcore_user
+          DB_PASSWORD: hexcore_password
+          DB_DATABASE: hexcore_test_db
+        continue-on-error: true
+      
+      - name: Verify JUnit report exists
+        if: always()
+        run: |
+          if [ -f "junit.xml" ]; then
+            echo "✅ JUnit report found"
+            ls -lh junit.xml
+          else
+            echo "❌ JUnit report not found"
+            exit 1
+          fi
+
+      - name: Test Report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: E2E Tests
+          path: ./junit.xml
+          reporter: java-junit
+          fail-on-error: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            ./junit.xml
+          retention-days: 30
+
+      - name: Generate Test & Coverage Report
+        if: always()
+        id: test-report
+        run: |
+          # Parse test results
+          if [ -f "./junit.xml" ]; then
+            TESTS_TOTAL=$(grep -oP 'tests="\K[0-9]+' ./junit.xml | head -1 || echo "0")
+            TESTS_FAILED=$(grep -oP 'failures="\K[0-9]+' ./junit.xml | head -1 || echo "0")
+            TESTS_PASSED=$((TESTS_TOTAL - TESTS_FAILED))
+          else
+            TESTS_TOTAL="0"
+            TESTS_FAILED="0"
+            TESTS_PASSED="0"
+          fi
+          
+          # Parse coverage
+          if [ -f "./coverage/coverage-summary.json" ]; then
+            COVERAGE_LINES=$(cat ./coverage/coverage-summary.json | jq -r '.total.lines.pct' 2>/dev/null || echo "0")
+            COVERAGE_STATEMENTS=$(cat ./coverage/coverage-summary.json | jq -r '.total.statements.pct' 2>/dev/null || echo "0")
+            COVERAGE_FUNCTIONS=$(cat ./coverage/coverage-summary.json | jq -r '.total.functions.pct' 2>/dev/null || echo "0")
+            COVERAGE_BRANCHES=$(cat ./coverage/coverage-summary.json | jq -r '.total.branches.pct' 2>/dev/null || echo "0")
+            
+            # Calculate average coverage
+            COVERAGE_TOTAL=$(cat ./coverage/coverage-summary.json | jq -r '
+              (.total.lines.pct + .total.statements.pct + .total.functions.pct + .total.branches.pct) / 4 | floor
+            ' 2>/dev/null || echo "0")
+          else
+            COVERAGE_LINES="N/A"
+            COVERAGE_STATEMENTS="N/A"
+            COVERAGE_FUNCTIONS="N/A"
+            COVERAGE_BRANCHES="N/A"
+            COVERAGE_TOTAL="0"
+          fi
+          
+          # Status emoji
+          if [ "$TESTS_FAILED" -eq "0" ]; then
+            TEST_ICON="✅"
+            TEST_STATUS="All tests passed"
+          else
+            TEST_ICON="❌"
+            TEST_STATUS="$TESTS_FAILED test(s) failed"
+          fi
+          
+          # Coverage emoji
+          if [ "$COVERAGE_TOTAL" != "0" ] && [ "$COVERAGE_TOTAL" != "N/A" ]; then
+            if [ "$COVERAGE_TOTAL" -ge 80 ]; then
+              COV_ICON="🟢"
+            elif [ "$COVERAGE_TOTAL" -ge 60 ]; then
+              COV_ICON="🟡"
+            else
+              COV_ICON="🔴"
+            fi
+            COV_TEXT="${COV_ICON} Coverage: ${COVERAGE_TOTAL}%"
+          else
+            COV_TEXT="⚠️ Coverage: Not available"
+          fi
+          
+          # Generate markdown report
+          cat << EOF > test-report.md
+          ## ${TEST_ICON} E2E Tests Results
+          
+          **Tests:** ${TESTS_PASSED}/${TESTS_TOTAL} passed | **Status:** ${TEST_STATUS}
+          
+          <details>
+          <summary>📊 View Details</summary>
+          
+          ### Test Breakdown
+          - ✅ Passed: ${TESTS_PASSED}
+          - ❌ Failed: ${TESTS_FAILED}
+          - 📊 Total: ${TESTS_TOTAL}
+          
+          ### Test Environment
+          - 🗄️ Database: MySQL 8.0
+          - 🔧 Node.js: ${{ matrix.node-version }}
+          - 📋 [Actions Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          </details>
+          
+          ---
+          *🤖 Auto-generated by GitHub Actions*
+          EOF
+          
+          # Save output
+          {
+            echo "report<<EOF"
+            cat test-report.md
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Comment Test Report on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: ${{ steps.test-report.outputs.report }}
+          comment_tag: e2e-test-report
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write to Step Summary
+        if: always()
+        run: |
+          if [ -f "test-report.md" ]; then
+            cat test-report.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## 🧪 E2E Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ -f "./junit.xml" ]; then
+              TESTS_TOTAL=$(grep -oP 'tests="\K[0-9]+' ./junit.xml | head -1 || echo "0")
+              TESTS_FAILED=$(grep -oP 'failures="\K[0-9]+' ./junit.xml | head -1 || echo "0")
+              TESTS_PASSED=$((TESTS_TOTAL - TESTS_FAILED))
+              
+              echo "- ✅ **Passed:** $TESTS_PASSED" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ **Failed:** $TESTS_FAILED" >> $GITHUB_STEP_SUMMARY
+              echo "- 📊 **Total:** $TESTS_TOTAL" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "Test results not available" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Prepare GitHub Pages content
+        if: github.ref == 'refs/heads/master' && always()
+        run: |
+          mkdir -p ./gh-pages/reports
+          
+          # Copy test report
+          if [ -f "test-report.md" ]; then
+            cp test-report.md ./gh-pages/reports/
+          fi
+          
+          # Create index.html
+          cat << 'EOF' > ./gh-pages/index.html
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Hydra Hexcore - E2E Test Reports</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; }
+              h1 { color: #333; }
+              .card { background: #f5f5f5; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
+              a { color: #0066cc; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+              .updated { color: #666; font-size: 0.9rem; }
+            </style>
+          </head>
+          <body>
+            <h1>🧪 Hydra Hexcore E2E Test Reports</h1>
+            <div class="card">
+              <h2>📋 Latest Test Results</h2>
+              <p><a href="./reports/test-report.md">View Test Report →</a></p>
+            </div>
+            <p class="updated">Last updated: <span id="date"></span></p>
+            <script>document.getElementById('date').textContent = new Date().toLocaleString();</script>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/master' && always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages
+          destination_dir: e2e-reports
+          keep_files: true
