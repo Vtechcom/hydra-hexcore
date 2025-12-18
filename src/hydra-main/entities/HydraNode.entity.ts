@@ -1,7 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
 import { Account } from './Account.entity';
-import { HydraParty } from './HydraParty.entity';
 import { Exclude } from 'class-transformer';
+import { HydraHead } from 'src/hydra-heads/entities/HydraHead.entity';
 
 @Entity()
 export class HydraNode {
@@ -26,14 +26,21 @@ export class HydraNode {
     @Column()
     vkey: string;
 
+    @Column()
+    cardanoVKey: string;
+
+    @Column()
+    cardanoSKey: string;
+
     @ManyToOne(() => Account, account => account.id)
     cardanoAccount: Account;
 
-    @ManyToOne(() => HydraParty, hydraParty => hydraParty.hydraNodes)
-    party: HydraParty;
+    @ManyToOne(() => HydraHead, hydraHead => hydraHead.hydraNodes)
+    hydraHead: HydraHead;
 
     @Column({
         default: new Date().toISOString(),
     })
     createdAt: string;
+    newHydraNode: import("/home/trinhmanhcuong/Documents/vtechcom-project/hydra-hexcore/src/hydra-main/entities/HydraParty.entity").HydraParty;
 }

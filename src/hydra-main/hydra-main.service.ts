@@ -212,7 +212,7 @@ export class HydraMainService implements OnModuleInit {
         return;
     }
 
-    @Cron('*/10 * * * * *')
+    // @Cron('*/10 * * * * *')
     async updateHydraContainerStatus() {
         // Update hydra party status
         // Check container with "Name": "/hexcore-hydra-node-[ID]" that has running status
@@ -575,7 +575,7 @@ export class HydraMainService implements OnModuleInit {
             newHydraNode.skey = skey;
             newHydraNode.vkey = vkey;
             newHydraNode.port = await this.genValidPort();
-            newHydraNode.party = newParty;
+            // newHydraNode.hydraHead = newParty;
             await this.hydraNodeRepository.save(newHydraNode);
             nodes.push({
                 ...newHydraNode,

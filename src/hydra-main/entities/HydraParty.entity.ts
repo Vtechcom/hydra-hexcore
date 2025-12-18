@@ -28,6 +28,6 @@ export class HydraParty {
   })
   createdAt: string;
 
-  @OneToMany(() => HydraNode, (hydraNode) => hydraNode.party)
+  @OneToMany(() => HydraNode, (hydraNode) => hydraNode.hydraHead)
   hydraNodes: HydraNode[];
 }

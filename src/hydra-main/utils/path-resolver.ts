@@ -2,6 +2,10 @@ export function resolvePartyDirPath(partyId: number | string, prefix = '') {
     return `${removeTrailingSlash(prefix)}/party-${partyId}`
 }
 
+export function resolveHeadDirPath(headId: number | string, prefix = '') {
+    return `${removeTrailingSlash(prefix)}/head-${headId}`
+}
+
 /**
  * @deprecated
  */
@@ -15,13 +19,13 @@ export function resolveNodeDirPath(nodeName: string, partyId?: number  | string)
 
 /**
  * 
- * @param partyId example: `1`
+ * @param headId example: `1`
  * @param nodeName Name of hydra node, example: `'hydra-node-1'`
  * @param prefix Prefix path dir, example: `/home/ubuntu/hydra-persistences`
- * @returns `/home/ubuntu/hydra-persistences/party-1/persistence-hydra-node-1`
+ * @returns `/home/ubuntu/hydra-persistences/head-1/persistence-hydra-node-1`
  */
-export function resolvePersistenceDir(partyId: number | string, nodeName: string, prefix = '') {
-    return `${resolvePartyDirPath(partyId, prefix)}/persistence-${nodeName}`
+export function resolvePersistenceDir(headId: number | string, nodeName: string, prefix = '') {
+    return `${resolveHeadDirPath(headId, prefix)}/persistence-${nodeName}`
 }
 
 function removeTrailingSlash(str: string): string {
