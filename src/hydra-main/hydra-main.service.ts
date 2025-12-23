@@ -63,7 +63,7 @@ export class HydraMainService implements OnModuleInit {
         hydraNodeFolder: process.env.NEST_HYDRA_NODE_FOLDER || 'D:/Projects/Vtechcom/cardano-node/hydra/preprod',
         hydraNodeScriptTxId: process.env.NEST_HYDRA_NODE_SCRIPT_TX_ID || '',
         hydraNodeNetworkId: process.env.NEST_HYDRA_NODE_NETWORK_ID || '1',
-        cardanoAccountMinLovelace: process.env.ACCOUNT_MINT_LOVELACE || 50000000, // 50 ADA
+        cardanoAccountMinLovelace: process.env.ACCOUNT_MIN_LOVELACE || 50000000, // 50 ADA
         enableNetworkHost: process.env.NEST_DOCKER_ENABLE_NETWORK_HOST === 'true',
 
         // Dockerize

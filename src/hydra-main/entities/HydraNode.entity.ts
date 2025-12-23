@@ -42,5 +42,4 @@ export class HydraNode {
         default: new Date().toISOString(),
     })
     createdAt: string;
-    newHydraNode: import("/home/trinhmanhcuong/Documents/vtechcom-project/hydra-hexcore/src/hydra-main/entities/HydraParty.entity").HydraParty;
 }

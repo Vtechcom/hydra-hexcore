@@ -6,10 +6,10 @@ import { HydraHeadService } from './hydra-heads.service';
 import { HydraHeadController } from './hydra-heads.controller';
 import { Account } from 'src/hydra-main/entities/Account.entity';
 import { JwtModule } from '@nestjs/jwt';
-import { DockerService } from 'src/docker/docker.service';
 import { OgmiosClientService } from 'src/hydra-main/ogmios-client.service';
 import { jwtConstants } from 'src/constants';
 import { DockerModule } from 'src/docker/docker.module';
+import { HydraConfig } from 'src/config/hydra.config';
 
 @Module({
     imports: [
@@ -20,8 +20,8 @@ import { DockerModule } from 'src/docker/docker.module';
         }),
         DockerModule,
     ],
-    providers: [HydraHeadService, OgmiosClientService],
+    providers: [HydraHeadService, OgmiosClientService, HydraConfig],
     controllers: [HydraHeadController],
-    exports: [HydraHeadService],
+    exports: [HydraHeadService, HydraConfig],
 })
 export class HydraHeadsModule {}

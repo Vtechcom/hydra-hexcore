@@ -4,22 +4,21 @@ import { Cron } from '@nestjs/schedule';
 import Dockerode from 'dockerode';
 import Docker from 'dockerode';
 import { Caching } from 'src/common/interfaces/cache.type';
-import { CONSTANTS } from 'src/common/contants/cardano.contant';
+import { HYDRA_CONFIG, HydraConfigInterface } from 'src/config/hydra.config';
 
 @Injectable()
 export class DockerService {
     private readonly logger = new Logger(DockerService.name);
     private readonly docker: Dockerode;
-    private readonly CONSTANTS;
 
     constructor(
         @Inject(CACHE_MANAGER)
         private readonly cacheManager: Cache,
+        @Inject(HYDRA_CONFIG) private readonly hydraConfig: HydraConfigInterface,
     ) {
         this.docker = new Dockerode({
             socketPath: process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine',
         });
-        this.CONSTANTS = CONSTANTS();
     }
 
     @Cron('*/10 * * * * *')
@@ -34,8 +33,8 @@ export class DockerService {
                     })
                     .map(node => {
                         return {
-                            hydraNodeId: node.Labels[this.CONSTANTS.hydraNodeLabel],
-                            hydraHeadId: node.Labels[this.CONSTANTS.hydraHeadLabel],
+                            hydraNodeId: node.Labels[this.hydraConfig.hydraNodeLabel],
+                            hydraHeadId: node.Labels[this.hydraConfig.hydraHeadLabel],
                             container: node,
                             isActive: node.State === 'running',
                         };

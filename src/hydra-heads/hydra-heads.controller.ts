@@ -14,40 +14,40 @@ export class HydraHeadController {
         private readonly hydraHeadService: HydraHeadService,
     ) {}
 
-    // @UseGuards(AdminAuthGuard)
+    @UseGuards(AdminAuthGuard)
     @Post('create')
     async create(@Body() createHeadDto: CreateHydraHeadsDto) {
         return this.hydraHeadService.create(createHeadDto);
     }
 
-    // @UseGuards(AdminAuthGuard)
+    @UseGuards(AdminAuthGuard)
     @Post('active')
     @HttpCode(200)
     async active(@Body() activeHeadDto: ActiveHydraHeadsDto) {
         return this.hydraHeadService.activeHydraHead(activeHeadDto);
     }
 
-    // @UseGuards(AdminAuthGuard)
+    @UseGuards(AdminAuthGuard)
     @Get('list')
     async list() {
         return this.hydraHeadService.list();
     }
 
-    // @UseGuards(AdminAuthGuard)
+    @UseGuards(AdminAuthGuard)
     @Post('deactive')
     @HttpCode(200)
     async deactive(@Body() activeHeadDto: ActiveHydraHeadsDto) {
         return this.hydraHeadService.deactiveHydraHead(activeHeadDto);
     }
 
-    // @UserGuards(AdminAuthGuard)
+    @UseGuards(AdminAuthGuard)
     @Post('clear-head-data')
     @HttpCode(200)
     async clearHeadData(@Body() body: ClearHeadDataDto) {
         return this.hydraHeadService.clearHeadData(body);
     }
 
-    // @UseGuards(AdminAuthGuard)
+    @UseGuards(AdminAuthGuard)
     @Delete('delete/:id')
     async delete (@Query('id') id: number) {
         return this.hydraHeadService.delete(id);

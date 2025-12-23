@@ -1,6 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { HydraNode } from '../../hydra-main/entities/HydraNode.entity';
-import { ProtocolParameter } from '../interfaces/protocol-parameter.key';
+import { ProtocolParameterDto } from '../dto/protocol-parameter.dto';
 
 @Entity()
 export class HydraHead {
@@ -36,7 +36,7 @@ export class HydraHead {
     type: 'json',
     nullable: true,
   })
-  protocolParameters: ProtocolParameter;
+  protocolParameters: ProtocolParameterDto;
 
   @Column({
     type: 'enum',

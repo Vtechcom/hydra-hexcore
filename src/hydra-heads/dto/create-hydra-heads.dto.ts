@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ArrayNotEmpty, IsArray, IsNumber, IsOptional, IsString } from 'class-validator';
 import { HydraHeadKeys } from '../interfaces/hydra-head-keys.type';
-import { ProtocolParameter } from '../interfaces/protocol-parameter.key';
+import { ProtocolParameterDto } from './protocol-parameter.dto';
 
 export class CreateHydraHeadsDto {
   @ApiProperty({ description: 'Description of the hydra head', example: 'Test Hydra Heads' })
@@ -52,5 +52,5 @@ export class CreateHydraHeadsDto {
     },
   })
   @IsOptional()
-  protocolParameters?: ProtocolParameter;
+  protocolParameters?: ProtocolParameterDto;
 }

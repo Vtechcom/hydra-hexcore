@@ -12,7 +12,6 @@ import { access, constants, mkdir, rm } from 'node:fs/promises';
 import { chmodSync, writeFileSync } from 'node:fs';
 import { resolveHydraNodeName } from 'src/hydra-main/utils/name-resolver';
 import { generateKeyFile } from 'src/utils/generator.util';
-import { TypeKey } from 'src/enums/type-key.enum';
 import { ActiveHydraHeadsDto } from './dto/active-hydra-heads.dto';
 import { CardanoCliJs } from 'cardanocli-js';
 import Docker from 'dockerode';
@@ -24,13 +23,13 @@ import { getEnterpriseAddressFromKeys } from 'src/utils/cardano-core';
 import { HydraHeadKeys } from './interfaces/hydra-head-keys.type';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Caching } from 'src/common/interfaces/cache.type';
-import { CONSTANTS } from 'src/common/contants/cardano.contant';
 import { ClearHeadDataDto } from './dto/clear-head-data.dto';
+import { HYDRA_CONFIG, HydraConfigInterface } from 'src/config/hydra.config';
+import { CARDANO_SK, CARDANO_VK, HYDRA_SK, HYDRA_VK } from './contants/type-key.contants';
 
 @Injectable()
 export class HydraHeadService {
     private logger = new Logger(HydraHeadService.name);
-    private readonly CONSTANTS;
 
     constructor(
         @InjectRepository(HydraHead)
@@ -43,9 +42,8 @@ export class HydraHeadService {
         private readonly dockerService: DockerService,
         private readonly ogmiosClientService: OgmiosClientService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    ) {
-        this.CONSTANTS = CONSTANTS();
-    }
+        @Inject(HYDRA_CONFIG) private readonly hydraConfig: HydraConfigInterface,
+    ) {}
 
     async create(body: CreateHydraHeadsDto) {
         const queryRunner = this.dataSource.createQueryRunner();
@@ -57,9 +55,9 @@ export class HydraHeadService {
             const newHydraHead = this.hydraHeadRepository.create();
             newHydraHead.description = body.description;
             newHydraHead.status = 'configured';
-            newHydraHead.contestationPeriod = body.contestationPeriod.toString();
-            newHydraHead.depositPeriod = body.depositPeriod.toString();
-            newHydraHead.persistenceRotateAfter = body.persistenceRotateAfter.toString();
+            newHydraHead.contestationPeriod = body.contestationPeriod?.toString();
+            newHydraHead.depositPeriod = body.depositPeriod?.toString();
+            newHydraHead.persistenceRotateAfter = body.persistenceRotateAfter?.toString();
             newHydraHead.protocolParameters = body.protocolParameters;
             newHydraHead.nodes = body.hydraHeadKeys.length;
             const account = await this.accountRepository.findOne({
@@ -70,7 +68,7 @@ export class HydraHeadService {
             await this.hydraHeadRepository.save(newHydraHead);
 
             // create head directory
-            const headDirPath = resolveHeadDirPath(newHydraHead.id, this.CONSTANTS.hydraNodeFolder);
+            const headDirPath = resolveHeadDirPath(newHydraHead.id, this.hydraConfig.hydraNodeFolder);
             try {
                 await access(headDirPath, constants.R_OK | constants.W_OK);
             } catch (error: any) {
@@ -96,15 +94,15 @@ export class HydraHeadService {
                 const cardanoVkeyFilePath = `${headDirPath}/${nodeName}.cardano.vk`;
 
                 // create credentials files
-                await this.writeFile(skeyFilePath, generateKeyFile(newHydraNode.skey, TypeKey.HYDRA_SK));
-                await this.writeFile(vkeyFilePath, generateKeyFile(newHydraNode.vkey, TypeKey.HYDRA_VK));
+                await this.writeFile(skeyFilePath, generateKeyFile(newHydraNode.skey, HYDRA_SK));
+                await this.writeFile(vkeyFilePath, generateKeyFile(newHydraNode.vkey, HYDRA_VK));
                 await this.writeFile(
                     cardanoSkeyFilePath,
-                    generateKeyFile(newHydraNode.cardanoSKey, TypeKey.CARDANO_SK),
+                    generateKeyFile(newHydraNode.cardanoSKey, CARDANO_SK),
                 );
                 await this.writeFile(
                     cardanoVkeyFilePath,
-                    generateKeyFile(newHydraNode.cardanoVKey, TypeKey.CARDANO_VK),
+                    generateKeyFile(newHydraNode.cardanoVKey, CARDANO_VK),
                 );
                 console.log(`Created credential files for ${nodeName}`);
             }
@@ -149,6 +147,13 @@ export class HydraHeadService {
         return activeNodes;
     }
 
+    async countActiveNodes(): Promise<number> {
+        // Get active nodes from cache (updated by cron job every 10 seconds)
+        // This is more accurate than querying database as it reflects actual running containers
+        const activeNodes = await this.getActiveNodeContainers();
+        return activeNodes.length;
+    }
+
     async createHydraNode(head: HydraHead, account: Account, hydraHeadKey: HydraHeadKeys): Promise<HydraNode> {
         const newHydraNode = this.hydraNodeRepository.create();
         newHydraNode.cardanoAccount = account;
@@ -165,6 +170,7 @@ export class HydraHeadService {
     }
 
     async activeHydraHead(activeHeadDto: ActiveHydraHeadsDto): Promise<HydraHead> {
+        console.log('Load hydra config: ', this.hydraConfig);
         const headId = activeHeadDto.id;
         const head = await this.hydraHeadRepository
             .createQueryBuilder('head')
@@ -177,6 +183,23 @@ export class HydraHeadService {
             this.logger.error('Invalid Head Id');
             throw new BadRequestException('Invalid Head Id');
         }
+
+        // Check if adding this head would exceed max active nodes limit
+        const currentActiveNodesCount = await this.countActiveNodes();
+        const nodesToAdd = head.hydraNodes.length;
+        const maxActiveNodes = this.hydraConfig.maxActiveNodes || 20;
+
+        if (currentActiveNodesCount + nodesToAdd > maxActiveNodes) {
+            this.logger.error(
+                `Cannot activate head: would exceed maximum active nodes limit (${maxActiveNodes}). ` +
+                `Current active: ${currentActiveNodesCount}, attempting to add: ${nodesToAdd}`,
+            );
+            throw new BadRequestException(
+                `Cannot activate head: maximum active nodes limit (${maxActiveNodes}) would be exceeded. ` +
+                `Current active nodes: ${currentActiveNodesCount}, nodes to add: ${nodesToAdd}`,
+            );
+        }
+
         // if (head.status === 'ACTIVE') {
         //     throw new BadRequestException('Head is already active');
         // }
@@ -192,7 +215,7 @@ export class HydraHeadService {
                 throw new BadRequestException(enterpriseAddress + ' not enough lovelace');
             }
         }
-        const headDirPath = resolveHeadDirPath(head.id, this.CONSTANTS.hydraNodeFolder);
+        const headDirPath = resolveHeadDirPath(head.id, this.hydraConfig.hydraNodeFolder);
 
         // generate protocol-parameters.json
         const cardanoCli = new CardanoCliJs({
@@ -271,7 +294,7 @@ export class HydraHeadService {
                     })
                     .flat();
                 const containerConfig: Docker.ContainerCreateOptions = {
-                    Image: this.CONSTANTS.hydraNodeImage,
+                    Image: this.hydraConfig.hydraNodeImage,
                     // eslint-disable-next-line @typescript-eslint/naming-convention
                     // prettier-ignore
                     Cmd: [
@@ -285,21 +308,21 @@ export class HydraHeadService {
                         ...peerNodeParams,
                         '--cardano-signing-key', `/data/head-${head.id}/${nodeName}.cardano.sk`,
                         // Skip hydra-scripts-tx-id if empty - let Hydra use built-in scripts
-                        ...(this.CONSTANTS.hydraNodeScriptTxId ? ['--hydra-scripts-tx-id', this.CONSTANTS.hydraNodeScriptTxId] : []),
+                        ...(this.hydraConfig.hydraNodeScriptTxId ? ['--hydra-scripts-tx-id', this.hydraConfig.hydraNodeScriptTxId] : []),
                         '--persistence-rotate-after', head.persistenceRotateAfter, // 15_000 seq
 
                         '--deposit-period', head.depositPeriod + 's',
                         '--contestation-period', head.contestationPeriod + 's',
                         
-                        '--testnet-magic', `${this.CONSTANTS.hydraNodeNetworkId}`,
+                        '--testnet-magic', `${this.hydraConfig.hydraNodeNetworkId}`,
                         '--node-socket', `/cardano-node/node.socket`,
                         '--ledger-protocol-parameters', `/data/head-${head.id}/protocol-parameters.json`,
                     ],
                     HostConfig: {
                         NetworkMode: 'hydra-network',
                         Binds: [
-                            `${this.CONSTANTS.hydraNodeFolder}:/data`,
-                            `${this.CONSTANTS.cardanoNodeFolder}:/cardano-node`,
+                            `${this.hydraConfig.hydraNodeFolder}:/data`,
+                            `${this.hydraConfig.cardanoNodeFolder}:/cardano-node`,
                         ],
                         PortBindings: {
                             [`${node.port}/tcp`]: [{ HostPort: `${node.port}` }],
@@ -311,8 +334,8 @@ export class HydraHeadService {
                         [`${node.port + 1000}/tcp`]: {},
                     },
                     Labels: {
-                        [this.CONSTANTS.hydraHeadLabel]: head.id.toString(),
-                        [this.CONSTANTS.hydraNodeLabel]: node.id.toString(),
+                        [this.hydraConfig.hydraHeadLabel]: head.id.toString(),
+                        [this.hydraConfig.hydraNodeLabel]: node.id.toString(),
                     },
                     Env: [
                         'ETCD_AUTO_COMPACTION_MODE=periodic',
@@ -464,8 +487,8 @@ export class HydraHeadService {
         const a_utxo = await this.getAddressUtxo(enterpriseAddress);
         const totalLovelace = Object.values(a_utxo).reduce((sum, item) => sum + item.value.lovelace, 0);
         console.log(`[${enterpriseAddress}]:[${totalLovelace} lovelace]`);
-        console.log(`Total lovelace: ${totalLovelace}, Required minimum: ${this.CONSTANTS.cardanoAccountMinLovelace}`);
-        return totalLovelace >= this.CONSTANTS.cardanoAccountMinLovelace ? true : false;
+        console.log(`Total lovelace: ${totalLovelace}, Required minimum: ${this.hydraConfig.cardanoAccountMinLovelace}`);
+        return totalLovelace >= this.hydraConfig.cardanoAccountMinLovelace ? true : false;
     }
 
     async getAddressUtxo(address: string): Promise<AddressUtxoDto> {
@@ -501,7 +524,7 @@ export class HydraHeadService {
                     const persistenceDir = resolvePersistenceDir(
                         head.id,
                         resolveHydraNodeName(node.id),
-                        this.CONSTANTS.hydraNodeFolder,
+                        this.hydraConfig.hydraNodeFolder,
                     );
                     console.log('persistenceDir', persistenceDir);
                     try {

@@ -10,5 +10,8 @@
     "^src/(.*)$": "<rootDir>/../src/$1"
   },
   "moduleDirectories": ["node_modules", "<rootDir>/.."],
-  "testTimeout": 30000
+  "testTimeout": 30000,
+  "maxWorkers": 1,
+  "forceExit": true,
+  "detectOpenHandles": true
 }
