@@ -12,6 +12,7 @@ import { createKeyv, Keyv } from '@keyv/redis';
 import { CacheableMemory } from 'cacheable';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './config/winston.config';
+import { HydraHeadsModule } from './hydra-heads/hydra-heads.module';
 
 @Module({
     imports: [
@@ -40,6 +41,7 @@ import { winstonConfig } from './config/winston.config';
         }),
         HydraMainModule,
         ShellModule,
+        HydraHeadsModule,
         TypeOrmModule.forRootAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({

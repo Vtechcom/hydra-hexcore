@@ -63,7 +63,7 @@ export class HydraMainService implements OnModuleInit {
         hydraNodeFolder: process.env.NEST_HYDRA_NODE_FOLDER || 'D:/Projects/Vtechcom/cardano-node/hydra/preprod',
         hydraNodeScriptTxId: process.env.NEST_HYDRA_NODE_SCRIPT_TX_ID || '',
         hydraNodeNetworkId: process.env.NEST_HYDRA_NODE_NETWORK_ID || '1',
-        cardanoAccountMinLovelace: process.env.ACCOUNT_MINT_LOVELACE || 50000000, // 50 ADA
+        cardanoAccountMinLovelace: process.env.ACCOUNT_MIN_LOVELACE || 50000000, // 50 ADA
         enableNetworkHost: process.env.NEST_DOCKER_ENABLE_NETWORK_HOST === 'true',
 
         // Dockerize
@@ -212,7 +212,7 @@ export class HydraMainService implements OnModuleInit {
         return;
     }
 
-    @Cron('*/10 * * * * *')
+    // @Cron('*/10 * * * * *')
     async updateHydraContainerStatus() {
         // Update hydra party status
         // Check container with "Name": "/hexcore-hydra-node-[ID]" that has running status
@@ -575,7 +575,7 @@ export class HydraMainService implements OnModuleInit {
             newHydraNode.skey = skey;
             newHydraNode.vkey = vkey;
             newHydraNode.port = await this.genValidPort();
-            newHydraNode.party = newParty;
+            // newHydraNode.hydraHead = newParty;
             await this.hydraNodeRepository.save(newHydraNode);
             nodes.push({
                 ...newHydraNode,

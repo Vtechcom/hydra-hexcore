@@ -1,3 +1,4 @@
+import { JwtService } from "@nestjs/jwt";
 import { DataSource } from "typeorm";
 
 export const StatusConsumerType = {
@@ -90,4 +91,21 @@ export async function clearDatabase(dataSource: DataSource) {
 
     // Re-enable foreign key checks
     await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
+}
+
+export async function createAdminAccountAndGetToken(dataSource: DataSource, jwtService: JwtService) {
+    const userRepository = dataSource.getRepository('User');
+    let admin = await userRepository.findOneBy({ username: 'admin' });
+    if (!admin) {
+        const dataCreate = {
+            username: 'admin',
+            password: 'strongpassword123',
+            role: 'admin',
+        };
+        admin = userRepository.create(dataCreate);
+        await userRepository.save(admin);
+    }
+    const payload = { username: admin.username, id: admin.id, role: admin.role };
+    
+    return await jwtService.signAsync(payload);
 }

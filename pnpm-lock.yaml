@@ -21,8 +21,8 @@ importers:
         specifier: ^0.0.5
         version: 0.0.5
       '@hydra-sdk/core':
-        specifier: ^1.1.0
-        version: 1.1.0
+        specifier: ^1.1.5
+        version: 1.1.5
       '@hydra-sdk/transaction':
         specifier: ^1.1.0
         version: 1.1.0
@@ -474,6 +474,10 @@ packages:
 
   '@hydra-sdk/core@1.1.0':
     resolution: {integrity: sha512-kMaNX8Cw8IWnwRfUahW3jMzncyWVKUwWBkCQy+kNFDL0m12J3TWl+M85ZjrZNRR8oMqEtPTiJu2jR7IigL1hyg==}
+    engines: {node: '>=10'}
+
+  '@hydra-sdk/core@1.1.5':
+    resolution: {integrity: sha512-ywnX6PYKtvUtUKsoOa1exBwItTPT1GGLSw0cj8+rE7m4TvfbeVM2mSioNGfw/tDfAIgl1oBg6Z7fD0+9+LtLcA==}
     engines: {node: '>=10'}
 
   '@hydra-sdk/transaction@1.1.0':
@@ -4452,6 +4456,15 @@ snapshots:
       '@emurgo/cardano-serialization-lib-nodejs': 14.1.2
 
   '@hydra-sdk/core@1.1.0':
+    dependencies:
+      '@hydra-sdk/cardano-wasm': 0.0.5
+      '@scure/base': 1.2.6
+      axios: 1.9.0
+      bip39: 3.1.0
+    transitivePeerDependencies:
+      - debug
+
+  '@hydra-sdk/core@1.1.5':
     dependencies:
       '@hydra-sdk/cardano-wasm': 0.0.5
       '@scure/base': 1.2.6

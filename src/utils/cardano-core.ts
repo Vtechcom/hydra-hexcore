@@ -1,5 +1,6 @@
 import * as CardanoWasm from '@emurgo/cardano-serialization-lib-nodejs';
 import { mnemonicToEntropy } from 'bip39';
+import { CardanoCliWallet } from '@hydra-sdk/core';
 
 export const NetworkInfo = {
   MAINNET: CardanoWasm.NetworkInfo.mainnet().network_id(),
@@ -172,4 +173,13 @@ export class PaymentVerificationKey {
 }
 export function getVerificationKeyFromSigningKey(skey: PaymentSigningKey): PaymentVerificationKey {
   return new PaymentVerificationKey(skey);
+}
+
+export function getEnterpriseAddressFromKeys(skey: `5820${string}`, vkey: `5820${string}`, networkId: number) {
+  const cliWallet = new CardanoCliWallet({
+    networkId: networkId,
+    skey: skey,
+    vkey: vkey
+  })
+  return cliWallet.getAddressBech32();
 }

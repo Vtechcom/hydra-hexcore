@@ -25,7 +25,7 @@
         "@cardano-ogmios/schema": "^6.13.0",
         "@emurgo/cardano-serialization-lib-nodejs": "^13.2.0",
         "@hydra-sdk/cardano-wasm": "^0.0.5",
-        "@hydra-sdk/core": "^1.1.0",
+        "@hydra-sdk/core": "^1.1.5",
         "@hydra-sdk/transaction": "^1.1.0",
         "@keyv/redis": "^4.3.2",
         "@nestjs/cache-manager": "^3.0.1",
