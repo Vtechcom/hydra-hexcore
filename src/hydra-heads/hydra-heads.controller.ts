@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from "@nestjs/common";
 import { HydraHeadService } from "./hydra-heads.service";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { CreateHydraHeadsDto } from "./dto/create-hydra-heads.dto";
@@ -49,7 +49,7 @@ export class HydraHeadController {
 
     @UseGuards(AdminAuthGuard)
     @Delete('delete/:id')
-    async delete (@Query('id') id: number) {
+    async delete (@Param('id') id: number) {
         return this.hydraHeadService.delete(id);
     }
 }
