@@ -28,6 +28,17 @@ export function resolvePersistenceDir(headId: number | string, nodeName: string,
     return `${resolveHeadDirPath(headId, prefix)}/persistence-${nodeName}`
 }
 
+/**
+ * 
+ * @param partyId example: `1`
+ * @param nodeName Name of hydra node, example: `'hydra-node-1'`
+ * @param prefix Prefix path dir, example: `/home/ubuntu/hydra-persistences`
+ * @returns `/home/ubuntu/hydra-persistences/party-1/persistence-hydra-node-1`
+ */
+export function resolvePersistenceDirParty(partyId: number | string, nodeName: string, prefix = '') {
+    return `${resolvePartyDirPath(partyId, prefix)}/persistence-${nodeName}`
+}
+
 function removeTrailingSlash(str: string): string {
     return str.replace(/\/+$/, '');
 }

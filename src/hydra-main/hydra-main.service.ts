@@ -32,7 +32,7 @@ import { HydraDto } from './dto/hydra.dto';
 import { Cron } from '@nestjs/schedule';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ReqClearPartyDataDto } from './dto/request/clear-party-data.dto';
-import { resolvePartyDirPath, resolvePersistenceDir } from './utils/path-resolver';
+import { resolvePartyDirPath, resolvePersistenceDirParty } from './utils/path-resolver';
 import { resolveHydraNodeName } from './utils/name-resolver';
 import { OgmiosClientService } from './ogmios-client.service';
 import { convertUtxoToUTxOObject } from './utils/ogmios-converter';
@@ -575,7 +575,7 @@ export class HydraMainService implements OnModuleInit {
             newHydraNode.skey = skey;
             newHydraNode.vkey = vkey;
             newHydraNode.port = await this.genValidPort();
-            // newHydraNode.hydraHead = newParty;
+            newHydraNode.party = newParty;
             await this.hydraNodeRepository.save(newHydraNode);
             nodes.push({
                 ...newHydraNode,
@@ -875,7 +875,7 @@ export class HydraMainService implements OnModuleInit {
                         '--listen', `0.0.0.0:${node.port + 1000}`,
                         '--advertise', `${nodeName}:${node.port + 1000}`, 
                         '--hydra-signing-key', `/data/party-${party.id}/${nodeName}.sk`,
-                        '--persistence-dir', `/data${resolvePersistenceDir(party.id, nodeName)}`,
+                        '--persistence-dir', `/data${resolvePersistenceDirParty(party.id, nodeName)}`,
                         '--api-host', '0.0.0.0',
                         '--api-port', `${node.port}`,
                         ...peerNodeParams,
@@ -1060,7 +1060,7 @@ export class HydraMainService implements OnModuleInit {
             const errors = [] as string[];
             for (const party of parties) {
                 for (const node of party.hydraNodes) {
-                    const persistenceDir = resolvePersistenceDir(
+                    const persistenceDir = resolvePersistenceDirParty(
                         party.id,
                         resolveHydraNodeName(node.id),
                         this.CONSTANTS.hydraNodeFolder,
