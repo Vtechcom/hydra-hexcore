@@ -1,7 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
 import { Account } from './Account.entity';
 import { Exclude } from 'class-transformer';
-import { HydraHead } from 'src/hydra-heads/entities/HydraHead.entity';
+import { HydraHead } from '../../hydra-heads/entities/HydraHead.entity';
 import { HydraParty } from './HydraParty.entity';
 
 @Entity()
