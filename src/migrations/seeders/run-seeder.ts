@@ -17,5 +17,5 @@ const child_process = spawn('npx', ['ts-node', path, ...args.filter(a => a !== p
 
 child_process.on('close', code => {
     console.log(`Child process exited with code ${code}`);
-    process.exit(code);
+    process.exit(code ?? 1);
 });

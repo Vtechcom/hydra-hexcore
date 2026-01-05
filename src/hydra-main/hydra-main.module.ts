@@ -4,7 +4,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { HydraNode } from './entities/HydraNode.entity';
 import { HydraMainController } from './hydra-main.controller';
 import { Account } from './entities/Account.entity';
-import { HydraParty } from './entities/HydraParty.entity';
 import { HydraAdminService } from './hydra-admin.service';
 import { User } from './entities/User.entity';
 import { JwtModule } from '@nestjs/jwt';
@@ -13,7 +12,7 @@ import { OgmiosClientService } from './ogmios-client.service';
 import { OgmiosController } from './ogmios.controller';
 @Module({
     imports: [
-        TypeOrmModule.forFeature([HydraNode, Account, HydraParty, User]),
+        TypeOrmModule.forFeature([HydraNode, Account, User]),
         JwtModule.register({
             secret: jwtConstants.secret,
             signOptions: { expiresIn: '1day' },

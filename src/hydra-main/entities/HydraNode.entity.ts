@@ -2,7 +2,6 @@ import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
 import { Account } from './Account.entity';
 import { Exclude } from 'class-transformer';
 import { HydraHead } from '../../hydra-heads/entities/HydraHead.entity';
-import { HydraParty } from './HydraParty.entity';
 
 @Entity()
 export class HydraNode {
@@ -38,9 +37,6 @@ export class HydraNode {
 
     @ManyToOne(() => HydraHead, hydraHead => hydraHead.hydraNodes)
     hydraHead: HydraHead;
-
-    @ManyToOne(() => HydraParty, hydraParty => hydraParty.hydraNodes)
-    party: HydraParty;
 
     @Column({
         default: new Date().toISOString(),
