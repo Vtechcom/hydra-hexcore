@@ -96,14 +96,8 @@ export class HydraHeadService {
                 // create credentials files
                 await this.writeFile(skeyFilePath, generateKeyFile(newHydraNode.skey, HYDRA_SK));
                 await this.writeFile(vkeyFilePath, generateKeyFile(newHydraNode.vkey, HYDRA_VK));
-                await this.writeFile(
-                    cardanoSkeyFilePath,
-                    generateKeyFile(newHydraNode.cardanoSKey, CARDANO_SK),
-                );
-                await this.writeFile(
-                    cardanoVkeyFilePath,
-                    generateKeyFile(newHydraNode.cardanoVKey, CARDANO_VK),
-                );
+                await this.writeFile(cardanoSkeyFilePath, generateKeyFile(newHydraNode.cardanoSKey, CARDANO_SK));
+                await this.writeFile(cardanoVkeyFilePath, generateKeyFile(newHydraNode.cardanoVKey, CARDANO_VK));
                 console.log(`Created credential files for ${nodeName}`);
             }
             await queryRunner.commitTransaction();
@@ -192,11 +186,11 @@ export class HydraHeadService {
         if (currentActiveNodesCount + nodesToAdd > maxActiveNodes) {
             this.logger.error(
                 `Cannot activate head: would exceed maximum active nodes limit (${maxActiveNodes}). ` +
-                `Current active: ${currentActiveNodesCount}, attempting to add: ${nodesToAdd}`,
+                    `Current active: ${currentActiveNodesCount}, attempting to add: ${nodesToAdd}`,
             );
             throw new BadRequestException(
                 `Cannot activate head: maximum active nodes limit (${maxActiveNodes}) would be exceeded. ` +
-                `Current active nodes: ${currentActiveNodesCount}, nodes to add: ${nodesToAdd}`,
+                    `Current active nodes: ${currentActiveNodesCount}, nodes to add: ${nodesToAdd}`,
             );
         }
 
@@ -487,7 +481,9 @@ export class HydraHeadService {
         const a_utxo = await this.getAddressUtxo(enterpriseAddress);
         const totalLovelace = Object.values(a_utxo).reduce((sum, item) => sum + item.value.lovelace, 0);
         console.log(`[${enterpriseAddress}]:[${totalLovelace} lovelace]`);
-        console.log(`Total lovelace: ${totalLovelace}, Required minimum: ${this.hydraConfig.cardanoAccountMinLovelace}`);
+        console.log(
+            `Total lovelace: ${totalLovelace}, Required minimum: ${this.hydraConfig.cardanoAccountMinLovelace}`,
+        );
         return totalLovelace >= this.hydraConfig.cardanoAccountMinLovelace ? true : false;
     }
 
@@ -579,6 +575,32 @@ export class HydraHeadService {
 
         return {
             message: `Hydra Head ${id} and its nodes have been deleted.`,
+        };
+    }
+
+    async restart(id: number) {
+        const head = await this.hydraHeadRepository.findOne({
+            where: { id },
+            relations: ['hydraNodes'],
+        });
+
+        if (!head) {
+            throw new NotFoundException('Hydra Head not found');
+        }
+
+        try {
+            await Promise.all(
+                head.hydraNodes.map(node => {
+                    const nodeName = this.getDockerContainerName(node);
+                    return this.dockerService.restartContainerByName(nodeName);
+                }),
+            );
+        } catch (err) {
+            throw new BadRequestException(`Failed to restart one or more containers: ${err.message}`);
+        }
+
+        return {
+            message: `Hydra Head ${id} containers have been restarted.`,
         };
     }
 }
