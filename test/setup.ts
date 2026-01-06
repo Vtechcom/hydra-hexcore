@@ -108,6 +108,7 @@ export async function createHydraHeadTestApp(): Promise<{
     const mockDockerService = {
         ensureHydraNetwork: jest.fn(),
         removeContainerByName: jest.fn(),
+        restartContainerByName: jest.fn(),
         createContainer: jest.fn(),
         updateHydraContainerStatus: jest.fn(),
         handleDockerContainerExist: jest.fn(),
@@ -117,6 +118,7 @@ export async function createHydraHeadTestApp(): Promise<{
     // Make some methods return promises by default to match real service behavior
     mockDockerService.ensureHydraNetwork.mockResolvedValue(undefined);
     mockDockerService.removeContainerByName.mockResolvedValue(undefined);
+    mockDockerService.restartContainerByName.mockResolvedValue(undefined);
     // Return a mock container object that implements `inspect()` as the
     // real Docker.Container does. The service calls `container.inspect()`
     // and expects an object with `Args` and `Config.Image`.

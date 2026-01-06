@@ -52,4 +52,11 @@ export class HydraHeadController {
     async delete (@Param('id') id: number) {
         return this.hydraHeadService.delete(id);
     }
+
+    @UseGuards(AdminAuthGuard)
+    @Post('restart/:id')
+    @HttpCode(200)
+    async restart(@Param('id') id: number) {
+        return this.hydraHeadService.restart(id);
+    }
 }

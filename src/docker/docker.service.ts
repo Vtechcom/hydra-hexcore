@@ -179,4 +179,16 @@ export class DockerService {
             throw new Error(`Failed to ensure network ${networkName}: ${error.message}`);
         }
     }
+
+    async restartContainerByName(name: string): Promise<void> {
+        try {
+            const container = await this.docker.getContainer(name);
+            if (container) {
+                await container.restart();
+                console.log(`Container ${name} restarted successfully`);
+            }
+        } catch (error: any) {
+            console.error(`Error while restarting container: ${name}`, error.message);
+        }
+    }
 }
