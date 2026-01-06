@@ -5,27 +5,22 @@
 Tests are organized by feature/domain for better maintainability:
 
 ### 1. **auth.e2e-spec.ts** - Authentication & Authorization
-- **29 test cases**
+- **11 test cases**
 - Admin login and authentication
-- Consumer login and authentication
 - Token validation (invalid, expired, malformed)
-- Cross-role access protection
-- Integration tests
+- Admin authorization with JWT tokens
 
 **Key Endpoints:**
 - `POST /hydra-main/login` - Admin login
 - `GET /hydra-main/auth` - Admin authentication check
-- `POST /hydra-consumer/consumer/login` - Consumer login
-- `GET /hydra-consumer/consumer/authorization` - Consumer auth check
 
 ---
 
 ### 2. **account.e2e-spec.ts** - Account Management
-- **21 test cases**
+- **12 test cases**
 - Account creation with mnemonic validation
-- Account listing with pagination
+- Account listing
 - BIP39 mnemonic support (128-bit and 256-bit)
-- Duplicate account prevention
 - Address generation validation
 
 **Key Endpoints:**
@@ -38,32 +33,12 @@ Tests are organized by feature/domain for better maintainability:
 
 ---
 
-### 3. **node.e2e-spec.ts** - Hydra Node CRUD
-- **31 test cases**
-- Node creation (with Docker dependency handling)
-- Node listing with pagination
-- Node detail retrieval
-- Integration tests
-
-**Key Endpoints:**
-- `POST /hydra-main/create-node` - Create Hydra node
-- `GET /hydra-main/hydra-nodes` - List nodes (paginated)
-- `GET /hydra-main/hydra-node/:id` - Get node details
-
-**Important Notes:**
-- Node creation requires Docker for key generation
-- Tests use `insertHydraNode()` helper to bypass Docker in most cases
-- Only one test actually calls create-node API (accepts 201 or 500)
-- Pagination limited to max 50 results
-
----
-
-### 4. **cardano.e2e-spec.ts** - Cardano Integration
-- **17 test cases**
+### 3. **cardano.e2e-spec.ts** - Cardano Integration
+- **8 test cases**
 - Cardano node info retrieval
 - UTXO queries by address
 - Address format validation (mainnet/testnet)
-- Concurrent query handling
+- Query consistency testing
 
 **Key Endpoints:**
 - `GET /hydra-main/node-info` - Get Cardano node information
@@ -77,21 +52,45 @@ Tests are organized by feature/domain for better maintainability:
 
 ---
 
-### 5. **hydra-container.e2e-spec.ts** - Container Management
-- **13 test cases**
-- Active Docker container listing
-- Container state vs database node comparison
-- Docker daemon availability handling
-- Performance testing
+### 4. **hydra-container.e2e-spec.ts** - Container Management
+- **6 test cases**
+- Active Docker container listing from cache
+- Cache consistency and updates
+- Performance testing with cache
+- Large dataset handling
 
 **Key Endpoints:**
 - `GET /hydra-main/active-nodes` - List active Hydra node containers
 
 **Important Notes:**
 - Public endpoint (no authentication)
-- Depends on Docker daemon availability
-- Active containers are independent of database nodes
-- Tests handle Docker unavailability gracefully
+- Reads from Redis cache (not directly from Docker)
+- Cache is updated by background cron job
+- Tests verify cache read performance
+
+---
+
+### 5. **hydra-heads.e2e-spec.ts** - Hydra Head Management
+- **31 test cases**
+- Hydra head creation and activation
+- Node limit validation (max 20 active nodes)
+- Head data cleanup
+- Head deletion with Docker cleanup
+- File system operation mocking for tests
+
+**Key Endpoints:**
+- `POST /hydra-heads/create` - Create new hydra head
+- `POST /hydra-heads/active` - Activate hydra head
+- `POST /hydra-heads/deactive` - Deactivate hydra head
+- `GET /hydra-heads/list` - List all hydra heads
+- `POST /hydra-heads/clear-head-data` - Clear head persistence data
+- `DELETE /hydra-heads/delete/:id` - Delete hydra head
+
+**Important Notes:**
+- Uses mocked file system operations (`writeFileSync`, `chmodSync`, `mkdir`, `access`)
+- Tests validate max active nodes limit enforcement
+- Includes cache-based active node counting
+- Admin authentication required for all endpoints
 
 ---
 
@@ -106,9 +105,9 @@ npx jest --config test/jest-e2e.json
 ```bash
 npx jest --config test/jest-e2e.json test/__test__/auth.e2e-spec.ts
 npx jest --config test/jest-e2e.json test/__test__/account.e2e-spec.ts
-npx jest --config test/jest-e2e.json test/__test__/node.e2e-spec.ts
 npx jest --config test/jest-e2e.json test/__test__/cardano.e2e-spec.ts
 npx jest --config test/jest-e2e.json test/__test__/hydra-container.e2e-spec.ts
+npx jest --config test/jest-e2e.json test/__test__/hydra-heads.e2e-spec.ts
 ```
 
 ### Run with coverage:
@@ -134,11 +133,8 @@ Configuration is overridden in `test/setup.ts`.
 Located in `test/helper.ts`:
 
 - `generateAdminTest()` - Generate test admin credentials
-- `generateConsumerTest()` - Generate test consumer credentials
 - `insertAdminAccount()` - Insert admin directly to database
-- `insertConsumerAccount()` - Insert consumer directly to database
 - `insertAccount()` - Insert Cardano account
-- `insertHydraNode()` - Insert Hydra node (bypasses Docker)
 - `clearDatabase()` - Clear all tables with FK handling
 
 ---
@@ -161,13 +157,17 @@ This ensures tests can run in parallel or in any order.
 ## Docker Dependencies
 
 Some features require Docker:
-- Hydra key generation (`POST /hydra-main/create-node`)
-- Active container listing (`GET /hydra-main/active-nodes`)
+- Docker container management for Hydra heads
 
 Tests are designed to handle Docker unavailability gracefully:
-- Accept both success and error status codes
-- Use database helpers to bypass Docker when testing data layer
-- Clearly document which tests require Docker
+- Mock file system operations to avoid actual disk I/O
+- Use mocked `writeFile` service method in Hydra heads tests
+- Accept both success and error status codes where Docker is involved
+
+**Mocking Strategy:**
+- File system operations (`node:fs` and `node:fs/promises`) are mocked globally in hydra-heads tests
+- Service methods like `writeFile` and `checkUtxoAccount` are mocked per test
+- Mock setup in `beforeAll` and cleanup in `afterEach` hooks
 
 ---
 
@@ -179,11 +179,10 @@ Tests are designed to handle Docker unavailability gracefully:
 
 Tests handle node unavailability and return appropriate status codes.
 
-### Docker Daemon
-- `POST /hydra-main/create-node` (for key generation)
+### Redis Cache
 - `GET /hydra-main/active-nodes`
 
-Tests gracefully handle when Docker is not running.
+Tests read from cache which is populated by background cron job.
 
 ---
 
@@ -191,12 +190,17 @@ Tests gracefully handle when Docker is not running.
 
 | Suite | Test Cases | Coverage |
 |-------|-----------|----------|
-| Authentication | 29 | Login, tokens, roles, cross-access |
-| Account Management | 21 | CRUD, validation, pagination |
-| Hydra Nodes | 31 | CRUD, pagination, integration |
-| Cardano Integration | 17 | Node info, UTXOs, addresses |
-| Container Management | 13 | Active nodes, Docker handling |
-| **Total** | **111** | **Comprehensive API coverage** |
+| Authentication | 11 | Admin login, JWT tokens, authorization |
+| Account Management | 12 | Account CRUD, mnemonic validation |
+| Cardano Integration | 8 | Node info, UTXOs, address validation |
+| Container Management | 6 | Cache-based active node listing |
+| Hydra Heads | 31 | Head CRUD, activation, node limits |
+| **Total** | **68** | **Comprehensive API coverage** |
+
+**Notes:**
+- All test suites use proper mocking for external dependencies
+- Tests are designed to run independently and can be executed in any order
+- File system operations are mocked in hydra-heads tests to avoid disk I/O
 
 ---
 

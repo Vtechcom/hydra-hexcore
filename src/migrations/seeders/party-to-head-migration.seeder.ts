@@ -1,6 +1,5 @@
 import 'dotenv/config';
 
-import { HydraParty } from '../../hydra-main/entities/HydraParty.entity';
 import { AppDataSource } from '../data-source';
 import { HydraHead } from '../../hydra-heads/entities/HydraHead.entity';
 import { HydraNode } from '../../hydra-main/entities/HydraNode.entity';
@@ -14,7 +13,7 @@ async function main() {
 
     await dataSource.transaction(async transactionalEntityManager => {
         const parties = await transactionalEntityManager
-            .getRepository(HydraParty)
+            .getRepository('HydraParty')
             .find({ relations: ['hydraNodes', 'hydraNodes.cardanoAccount'] });
 
         console.log(`Found ${parties.length} parties to process`);

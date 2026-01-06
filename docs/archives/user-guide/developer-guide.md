@@ -95,35 +95,42 @@ hydra-hexcore/
 │   │
 │   ├── auth/                      # 🔐 Module xác thực & phân quyền
 │   │   ├── admin-auth.guard.ts    # Guard cho admin routes
-│   │   ├── consumer-auth.guard.ts # Guard cho consumer routes
-│   │   ├── game-auth.guard.ts     # Guard cho game routes
 │   │   ├── jwt.helper.ts          # JWT utilities
 │   │   ├── role.guard.ts          # Role-based access control
 │   │   └── socket.guard.ts        # WebSocket authentication
 │   │
-│   ├── hydra-main/                # 🚀 Module chính quản lý Hydra
+│   ├── hydra-main/                # 🚀 Module quản lý Accounts & Nodes
 │   │   ├── dto/                   # Data Transfer Objects
 │   │   ├── entities/              # TypeORM entities
 │   │   │   ├── Account.entity.ts
 │   │   │   ├── HydraNode.entity.ts
-│   │   │   └── HydraParty.entity.ts
+│   │   │   └── User.entity.ts
 │   │   ├── utils/                 # Helper functions
 │   │   ├── hydra-main.controller.ts    # REST API endpoints
 │   │   ├── hydra-main.gateway.ts       # WebSocket gateway
-│   │   ├── hydra-main.service.ts       # Business logic chính
-│   │   ├── hydra-admin.service.ts      # Admin operations
+│   │   ├── hydra-main.service.ts       # Account & Node management
+│   │   ├── hydra-admin.service.ts      # Admin authentication
 │   │   ├── ogmios-client.service.ts    # Ogmios integration
 │   │   ├── ogmios.controller.ts        # Ogmios API wrapper
 │   │   └── hydra-main.module.ts
 │   │
-│   ├── hydra-consumer/            # 👥 Module quản lý consumers
-│   │   ├── dto/
-│   │   ├── entities/
-│   │   │   ├── Consumer.entity.ts
-│   │   │   └── ConsumerKeyMapper.entity.ts
-│   │   ├── hydra-consumer.controller.ts
-│   │   ├── hydra-consumer.service.ts
-│   │   └── hydra-consumer.module.ts
+│   ├── hydra-heads/               # 🎯 Module quản lý Hydra Heads
+│   │   ├── dto/                   # Data Transfer Objects
+│   │   │   ├── create-hydra-heads.dto.ts
+│   │   │   ├── active-hydra-heads.dto.ts
+│   │   │   └── clear-head-data.dto.ts
+│   │   ├── entities/              # TypeORM entities
+│   │   │   └── HydraHead.entity.ts
+│   │   ├── interfaces/            # TypeScript interfaces
+│   │   │   └── hydra-head-keys.type.ts
+│   │   ├── contants/              # Constants
+│   │   ├── hydra-heads.controller.ts   # REST API endpoints
+│   │   ├── hydra-heads.service.ts      # Head lifecycle management
+│   │   └── hydra-heads.module.ts
+│   │
+│   ├── docker/                    # 🐳 Module quản lý Docker
+│   │   ├── docker.service.ts      # Docker operations
+│   │   └── docker.module.ts
 │   │
 │   ├── shell/                     # 🐚 Module thực thi shell commands
 │   │   ├── shell.service.ts       # Execute bash scripts
@@ -319,9 +326,12 @@ AppModule
 │   ├── OgmiosClientService
 │   └── OgmiosController
 │
-├── HydraConsumerModule
-│   ├── HydraConsumerController
-│   └── HydraConsumerService
+├── HydraHeadsModule
+│   ├── HydraHeadController
+│   └── HydraHeadService
+│
+├── DockerModule
+│   └── DockerService
 │
 └── ShellModule
     └── ShellService
@@ -329,8 +339,8 @@ AppModule
 
 **Dependencies flow:**
 - `HydraMainService` → `OgmiosClientService` (query blockchain)
-- `HydraMainService` → `ShellService` (execute CLI commands)
-- `HydraConsumerService` → `HydraMainService` (share nodes)
+- `HydraHeadService` → `DockerService` (manage containers)
+- `HydraHeadService` → `OgmiosClientService` (query UTxO)
 - All controllers → Auth Guards (authentication/authorization)
 
 ### 2.6 Database & Cache Layer
@@ -340,7 +350,7 @@ AppModule
 **Account** - Quản lý ví Cardano
 ```typescript
 {
-  id: string (UUID)
+  id: number
   name: string
   address: string (Cardano address)
   mnemonic: string (encrypted)
@@ -349,31 +359,46 @@ AppModule
 }
 ```
 
-**HydraParty** - Quản lý parties trong Hydra Head
+**HydraHead** - Quản lý Hydra Heads
 ```typescript
 {
-  id: string (UUID)
-  alias: string (tên party)
-  vkey: string (verification key)
-  skey: string (signing key - encrypted)
-  persistencePath: string
+  id: number
+  description: string
+  status: string (configured, active, inactive)
+  contestationPeriod: string
+  depositPeriod: string
+  persistenceRotateAfter: string
+  protocolParameters: object
+  nodes: number (số lượng nodes)
+  hydraNodes: HydraNode[] (relation)
   createdAt: Date
   updatedAt: Date
-  nodes: HydraNode[] (relation)
 }
 ```
 
 **HydraNode** - Quản lý Hydra Node containers
 ```typescript
 {
-  id: string (UUID)
-  port: number
-  apiUrl: string
+  id: number
   description: string
-  party: HydraParty (relation)
-  account: Account (relation)
-  isActive: boolean
-  containerName: string
+  port: number (unique)
+  skey: string (Hydra signing key)
+  vkey: string (Hydra verification key)
+  cardanoVKey: string (Cardano verification key)
+  cardanoSKey: string (Cardano signing key)
+  cardanoAccount: Account (relation)
+  hydraHead: HydraHead (relation)
+  createdAt: string
+}
+```
+
+**User** - Quản lý admin users
+```typescript
+{
+  id: number
+  username: string
+  password: string
+  role: string
   createdAt: Date
   updatedAt: Date
 }
@@ -382,17 +407,6 @@ AppModule
 **Consumer** - Quản lý API consumers
 ```typescript
 {
-  id: string (UUID)
-  address: string
-  name: string
-  status: ConsumerStatus
-  apiKey: string
-  nodes: HydraNode[] (many-to-many)
-  createdAt: Date
-  updatedAt: Date
-}
-```
-
 #### **Redis Cache Structure**
 
 ```typescript
@@ -401,7 +415,7 @@ AppModule
   activeNodes: ContainerNode[]  // TTL: 60s
   // ContainerNode = {
   //   hydraNodeId: string
-  //   hydraPartyId: string
+  //   hydraHeadId: string
   //   container: Docker.ContainerInfo
   //   isActive: boolean
   // }
@@ -413,8 +427,9 @@ AppModule
 #### **Cardano Node**
 - **Vai trò**: Đồng bộ Cardano blockchain, cung cấp socket IPC
 - **Config**: `/configs/cardano/config.json`, `topology.json`
-- **Socket path**: `/cardano-node/node.socket` (mounted volume)
-- **Network**: Preprod testnet (có thể config mainnet)
+- **Socket path**: `/workspace/node.socket` (mounted volume)
+- **Network**: Preprod testnet (network-id: 1)
+- **Image**: `ghcr.io/intersectmbo/cardano-node:10.1.4`
 
 #### **Ogmios**
 - **Vai trò**: JSON-RPC API wrapper cho Cardano node
@@ -423,13 +438,17 @@ AppModule
   - Query UTxO
   - Submit transactions
   - Query protocol parameters
-  - Chain sync
+  - Evaluate transactions
 
 #### **Hydra Node**
-- **Image**: `ghcr.io/cardano-scaling/hydra-node:0.20.0`
-- **API**: REST + WebSocket
-- **Persistence**: Mounted volumes per party
-- **Network**: Bridge network với Cardano node
+- **Image**: `ghcr.io/cardano-scaling/hydra-node:0.22.2`
+- **API**: REST (port 4001) + WebSocket (port 5001)
+- **Persistence**: Mounted volumes per head
+- **Network**: Custom bridge network `hydra-network`
+- **Key Features**:
+  - Multi-party state channels
+  - Fast finality
+  - Low transaction fees (configurable to 0)
 
 ### 2.8 Frontend Layer (UI)
 
@@ -571,59 +590,53 @@ export class AdminController {
 
 ### 3.2 Module `hydra-main/`
 
-Module core của hệ thống, quản lý toàn bộ lifecycle của Hydra nodes và heads.
+Module core của hệ thống, quản lý Account, Node info và Ogmios integration.
 
 #### **Services:**
 
-**`HydraMainService`** - Service chính quản lý Hydra nodes
+**`HydraMainService`** - Service chính quản lý Accounts và Hydra nodes
 ```typescript
 class HydraMainService {
   // Account Management
   async createAccount(dto: CreateAccountDto): Promise<Account>
-  async getAccounts(options: IPaginationOptions): Promise<Account[]>
-  async getAccount(id: string): Promise<Account>
-  
-  // Party Management
-  async createParty(dto: CreatePartyDto): Promise<HydraParty>
-  async getParties(): Promise<HydraParty[]>
-  async getParty(id: string): Promise<HydraParty>
-  async clearPartyData(dto: ReqClearPartyDataDto): Promise<void>
+  async getListAccount(): Promise<Account[]>
   
   // Node Management
-  async createNode(dto: CreateHydraNodeDto): Promise<HydraNode>
-  async getNodes(): Promise<HydraNode[]>
-  async getNode(id: string): Promise<HydraNode>
-  async deleteNode(id: string): Promise<void>
+  async getListHydraNode(options: { pagination: IPaginationOptions }): Promise<HydraDto[]>
+  async getHydraNodeById(id: number): Promise<HydraNode>
+  async getHydraNodeDetail(id: number): Promise<HydraNode>
   
-  // Container Operations
-  async activateParty(dto: ReqActivePartyDto): Promise<ResActivePartyDto>
-  async deactivateParty(partyId: string): Promise<void>
-  async restartParty(partyId: string): Promise<void>
+  // Cardano Node Operations
+  async getCardanoNodeInfo(): Promise<any>
+  async testOgmiosConnection(): Promise<any>
   
-  // Hydra Operations
-  async commitToHead(dto: CommitHydraDto): Promise<any>
-  async submitTransaction(dto: SubmitTxHydraDto): Promise<any>
-  async getHeadUTxO(nodeUrl: string): Promise<UTxOObject>
+  // UTxO Operations
+  async getAddressUtxo(address: string): Promise<AddressUtxoDto>
+  
+  // Container Management
+  async getActiveNodeContainers(): Promise<ContainerNode[]>
+  async getContainerIfExists(containerName: string): Promise<Docker.Container | null>
+  async createContainer(...): Promise<Docker.Container>
 }
 ```
 
 **Key Features:**
-- **Docker Management**: Tạo, start, stop containers qua Dockerode
-- **Key Generation**: Tạo Hydra verification/signing keys
-- **Persistence Management**: Quản lý thư mục persistence cho mỗi party
-- **Network Configuration**: Setup network, ports, volumes
-- **Caching**: Cache active nodes trong Redis để tăng performance
+- **Account Management**: Tạo và quản lý Cardano accounts với mnemonic
+- **Node Listing**: Lấy danh sách Hydra nodes với pagination
+- **Cardano Node Info**: Kiểm tra trạng thái Cardano node
+- **Ogmios Integration**: Kết nối và test Ogmios service
+- **UTxO Queries**: Query UTxO của addresses thông qua Ogmios
+- **Container Monitoring**: Theo dõi active Docker containers
 
-**`HydraAdminService`** - Admin operations
+**`HydraAdminService`** - Admin authentication
 ```typescript
 class HydraAdminService {
-  async getSystemStats(): Promise<SystemStats>
-  async getContainerLogs(containerId: string): Promise<string>
-  async pruneUnusedContainers(): Promise<void>
+  async login(dto: AdminLoginDto): Promise<{ accessToken: string }>
+  async auth(id: number): Promise<User>
 }
 ```
 
-**`OgmiosClientService`** - Ogmios integration
+**`OgmiosClientService`** - Ogmios integration service
 ```typescript
 class OgmiosClientService {
   async queryUtxo(address: string): Promise<UTxO[]>
@@ -637,37 +650,45 @@ class OgmiosClientService {
 
 **`HydraMainController`** - REST API endpoints
 ```typescript
-@Controller('api/hydra')
+@Controller('hydra-main')
 export class HydraMainController {
-  @Post('accounts')
+  // Authentication
+  @Post('login')
+  login(@Body() dto: AdminLoginDto)
+  
+  @Get('auth')
+  @UseGuards(AdminAuthGuard)
+  auth(@Req() req)
+  
+  // Account Management
+  @Post('create-account')
+  @UseGuards(AdminAuthGuard)
   createAccount(@Body() dto: CreateAccountDto)
   
-  @Get('accounts')
-  getAccounts(@Query() query: PaginationQuery)
+  @Get('list-account')
+  @UseGuards(AdminAuthGuard)
+  getListAccount()
   
-  @Post('parties')
-  createParty(@Body() dto: CreatePartyDto)
+  // Node Management
+  @Get('hydra-nodes')
+  getListNode(@Query() query: QueryHydraDto)
   
-  @Get('parties')
-  getParties()
+  @Get('hydra-node/:id')
+  getNodeDetail(@Param('id') id: string)
   
-  @Post('nodes')
-  createNode(@Body() dto: CreateHydraNodeDto)
+  // System Info
+  @Get('node-info')
+  getCardanoNodeInfo()
   
-  @Get('nodes')
-  getNodes()
+  @Get('ogmios')
+  getAccountInfo()
   
-  @Post('activate-party')
-  activateParty(@Body() dto: ReqActivePartyDto)
+  // UTxO Operations
+  @Get('utxo/:address')
+  getListUtxo(@Param('address') address: string)
   
-  @Post('deactivate-party/:id')
-  deactivateParty(@Param('id') id: string)
-  
-  @Post('commit')
-  commitToHead(@Body() dto: CommitHydraDto)
-  
-  @Post('submit-tx')
-  submitTransaction(@Body() dto: SubmitTxHydraDto)
+  @Get('active-nodes')
+  getActiveNodes()
 }
 ```
 
@@ -692,14 +713,159 @@ export class HydraMainGateway {
 }
 ```
 
+### 3.3 Module `hydra-heads/`
+
+Module quản lý Hydra Heads - tạo, kích hoạt, và quản lý lifecycle của Hydra heads.
+
+#### **Services:**
+
+**`HydraHeadService`** - Service chính quản lý Hydra Heads
+```typescript
+class HydraHeadService {
+  // Head Management
+  async create(dto: CreateHydraHeadsDto): Promise<HydraHead>
+  async list(): Promise<HydraHead[]>
+  async delete(id: number): Promise<void>
+  
+  // Head Operations
+  async activeHydraHead(dto: ActiveHydraHeadsDto): Promise<HydraHead>
+  async deactiveHydraHead(dto: ActiveHydraHeadsDto): Promise<HydraHead>
+  async clearHeadData(dto: ClearHeadDataDto): Promise<void>
+  
+  // Node Management
+  async createHydraNode(head: HydraHead, account: Account, keys: HydraHeadKeys): Promise<HydraNode>
+  async getActiveNodeContainers(): Promise<ContainerNode[]>
+  async countActiveNodes(): Promise<number>
+  
+  // Utilities
+  async getAddressUtxo(address: string): Promise<AddressUtxoDto>
+  async genValidPort(): Promise<number>
+  async checkHydraNodePort(port: number): Promise<boolean>
+  async isPortAvailable(port: number): Promise<boolean>
+}
+```
+
+**Key Features:**
+- **Head Creation**: Tạo Hydra Head với nhiều nodes, generate keys (Hydra + Cardano)
+- **Docker Container Management**: Tạo và quản lý Docker containers cho từng node trong head
+- **Network Configuration**: Setup Hydra network với custom bridge network
+- **Key Management**: Quản lý Hydra verification/signing keys và Cardano keys cho mỗi node
+- **Persistence Management**: Quản lý persistence directories cho mỗi head
+- **Protocol Parameters**: Generate và configure protocol-parameters.json cho mỗi head
+- **UTxO Validation**: Kiểm tra và validate UTxO của các nodes trước khi activate
+- **Port Management**: Tự động phân bổ và kiểm tra ports cho nodes
+
+#### **Controllers:**
+
+**`HydraHeadController`** - REST API endpoints
+```typescript
+@Controller('hydra-heads')
+export class HydraHeadController {
+  // Head Management
+  @Post('create')
+  @UseGuards(AdminAuthGuard)
+  create(@Body() dto: CreateHydraHeadsDto)
+  
+  @Get('list')
+  @UseGuards(AdminAuthGuard)
+  list()
+  
+  @Delete('delete/:id')
+  @UseGuards(AdminAuthGuard)
+  delete(@Param('id') id: number)
+  
+  // Head Operations
+  @Post('active')
+  @UseGuards(AdminAuthGuard)
+  active(@Body() dto: ActiveHydraHeadsDto)
+  
+  @Post('deactive')
+  @UseGuards(AdminAuthGuard)
+  deactive(@Body() dto: ActiveHydraHeadsDto)
+  
+  @Post('clear-head-data')
+  @UseGuards(AdminAuthGuard)
+  clearHeadData(@Body() dto: ClearHeadDataDto)
+}
+```
+
+#### **DTOs:**
+
+**`CreateHydraHeadsDto`** - DTO để tạo Hydra Head mới
+```typescript
+class CreateHydraHeadsDto {
+  description?: string;
+  contestationPeriod?: number;  // Default: 60 seconds
+  depositPeriod?: number;       // Default: 120 seconds
+  persistenceRotateAfter?: number;
+  protocolParameters?: object;  // Custom protocol parameters
+  hydraHeadKeys: HydraHeadKeys[]; // Array of keys for each node in the head
+}
+
+interface HydraHeadKeys {
+  hydraVKey: string;    // Hydra verification key
+  hydraSKey: string;    // Hydra signing key
+  cardanoVKey: string;  // Cardano verification key
+  cardanoSKey: string;  // Cardano signing key
+}
+```
+
+**`ActiveHydraHeadsDto`** - DTO để activate/deactivate Head
+```typescript
+class ActiveHydraHeadsDto {
+  id: number; // Head ID
+}
+```
+
+#### **Entities:**
+
+**`HydraHead.entity.ts`**
+```typescript
+@Entity('hydra_heads')
+export class HydraHead {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ nullable: true })
+  description: string;
+
+  @Column({ default: 'configured' })
+  status: string; // configured, active, inactive
+
+  @Column({ nullable: true })
+  contestationPeriod: string;
+
+  @Column({ nullable: true })
+  depositPeriod: string;
+  
+  @Column({ nullable: true })
+  persistenceRotateAfter: string;
+
+  @Column({ type: 'json', nullable: true })
+  protocolParameters: object;
+
+  @Column({ default: 0 })
+  nodes: number;
+
+  @OneToMany(() => HydraNode, node => node.head)
+  hydraNodes: HydraNode[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+```
+
 #### **Entities:**
 
 **`Account.entity.ts`**
 ```typescript
 @Entity('accounts')
 export class Account {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column()
   name: string;
@@ -718,124 +884,269 @@ export class Account {
 }
 ```
 
-**`HydraParty.entity.ts`**
-```typescript
-@Entity('hydra_parties')
-export class HydraParty {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column()
-  alias: string;
-
-  @Column({ type: 'text' })
-  vkey: string;
-
-  @Column({ type: 'text' })
-  skey: string; // Encrypted
-
-  @Column()
-  persistencePath: string;
-
-  @OneToMany(() => HydraNode, node => node.party)
-  nodes: HydraNode[];
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-}
-```
-
 **`HydraNode.entity.ts`**
 ```typescript
-@Entity('hydra_nodes')
+@Entity()
 export class HydraNode {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
-  @Column()
+  @Column({ nullable: true, default: 'hydra-node' })
+  description: string;
+
+  @Column({ unique: true })
   port: number;
 
   @Column()
-  apiUrl: string;
-
-  @Column({ nullable: true })
-  description: string;
-
-  @ManyToOne(() => HydraParty, party => party.nodes)
-  party: HydraParty;
-
-  @ManyToOne(() => Account)
-  account: Account;
-
-  @Column({ default: false })
-  isActive: boolean;
+  skey: string; // Hydra signing key
 
   @Column()
-  containerName: string;
+  vkey: string; // Hydra verification key
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @Column()
+  cardanoVKey: string; // Cardano verification key
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @Column()
+  cardanoSKey: string; // Cardano signing key
+
+  @ManyToOne(() => Account, account => account.id)
+  cardanoAccount: Account;
+
+  @ManyToOne(() => HydraHead, hydraHead => hydraHead.hydraNodes)
+  hydraHead: HydraHead;
+
+  @Column({ default: new Date().toISOString() })
+  createdAt: string;
 }
 ```
 
-### 3.3 Module `hydra-consumer/`
+### 3.4 Module `docker/`
 
-Module quản lý external consumers sử dụng API của Hexcore.
+Module quản lý Docker operations.
 
-#### **Service:**
+#### **Services:**
 
-**`HydraConsumerService`**
+**`DockerService`** - Docker container management
 ```typescript
-class HydraConsumerService {
-  async createConsumer(dto: CreateConsumerDto): Promise<Consumer>
-  async listConsumers(query: QueryConsumersDto): Promise<Consumer[]>
-  async getConsumer(id: string): Promise<Consumer>
-  async updateConsumer(id: string, dto: UpdateConsumerDto): Promise<Consumer>
-  async deleteConsumer(id: string): Promise<void>
-  
-  async login(dto: ConsumerLoginDto): Promise<{ token: string }>
-  
-  async shareNodeWithConsumer(dto: ShareConsumerNodeDto): Promise<void>
-  async removeNodeFromConsumer(dto: RemoveConsumerNodeDto): Promise<void>
-  
-  async getConsumerNodes(consumerId: string): Promise<HydraNode[]>
+class DockerService {
+  async ensureHydraNetwork(): Promise<void>
+  async handleDockerContainerExist(containerName: string): Promise<void>
+  async removeContainer(containerId: string): Promise<void>
 }
 ```
 
-#### **Entities:**
+**Key Features:**
+- **Network Management**: Tạo và quản lý custom Docker bridge network
+- **Container Lifecycle**: Xử lý tồn tại container, remove containers
+- **Error Handling**: Xử lý gracefully Docker errors
 
-**`Consumer.entity.ts`**
+### 3.5 Module `shell/`
+
+Module thực thi shell commands.
+
+#### **Services:**
+
+**`ShellService`** - Execute shell commands
 ```typescript
-@Entity('consumers')
-export class Consumer {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+class ShellService {
+  async executeCommand(command: string, options?: object): Promise<string>
+}
+```
 
-  @Column({ unique: true })
-  address: string;
+**Key Features:**
+- **Command Execution**: Thực thi shell commands
+- **Error Handling**: Capture và xử lý errors từ shell commands
+
+---
+
+## 4. Workflow Chi Tiết
+
+### 4.1 Tạo Hydra Head Mới
+
+**Flow:**
+1. Client gọi `POST /hydra-heads/create` với `CreateHydraHeadsDto`
+2. `HydraHeadService.create()`:
+   - Tạo HydraHead entity trong database
+   - Tạo thư mục head directory: `/data/head-{headId}/`
+   - Với mỗi node trong `hydraHeadKeys`:
+     - Tạo HydraNode entity
+     - Generate và lưu key files (Hydra + Cardano keys)
+     - Assign port cho node
+   - Commit transaction
+3. Return HydraHead object với danh sách nodes
+
+**Key Files Created:**
+```
+/data/head-{headId}/
+  ├── {nodeName}.sk          # Hydra signing key
+  ├── {nodeName}.vk          # Hydra verification key
+  ├── {nodeName}.cardano.sk  # Cardano signing key
+  └── {nodeName}.cardano.vk  # Cardano verification key
+```
+
+### 4.2 Activate Hydra Head
+
+**Flow:**
+1. Client gọi `POST /hydra-heads/active` với `ActiveHydraHeadsDto`
+2. `HydraHeadService.activeHydraHead()`:
+   - Load HydraHead và nodes từ database
+   - Validate UTxO của các Cardano accounts (enterprise addresses)
+   - Generate `protocol-parameters.json` từ Cardano node
+   - Ensure Docker network exists
+   - Với mỗi node:
+     - Generate Docker container config với:
+       - Peer connections
+       - Volume mounts (keys, persistence)
+       - Port mappings
+       - Environment variables
+     - Create và start container
+   - Update head status thành 'active'
+3. Return activated HydraHead
+
+**Docker Container Configuration:**
+```yaml
+Image: ghcr.io/cardano-scaling/hydra-node:0.22.2
+Networks:
+  - hydra-network
+Volumes:
+  - {headDir}:/data/head-{headId}
+  - {persistenceDir}:/data/persistence
+  - cardano-node-socket:/workspace
+Ports:
+  - {nodePort}:4001  # API port
+  - {nodePort+1000}:5001  # Peer port
+Command:
+  - --node-id {nodeId}
+  - --api-host 0.0.0.0
+  - --host 0.0.0.0
+  - --port 5001
+  - --peer {peerNode}:{peerPort}
+  - --hydra-signing-key /data/head-{headId}/{nodeName}.sk
+  - --cardano-signing-key /data/head-{headId}/{nodeName}.cardano.sk
+  - --ledger-protocol-parameters /data/head-{headId}/protocol-parameters.json
+  - ...
+```
+
+### 4.3 Deactivate Hydra Head
+
+**Flow:**
+1. Client gọi `POST /hydra-heads/deactive` với `ActiveHydraHeadsDto`
+2. `HydraHeadService.deactiveHydraHead()`:
+   - Load HydraHead và nodes
+   - Với mỗi node:
+     - Tìm Docker container
+     - Stop và remove container
+   - Update head status thành 'inactive'
+   - Clear cache
+3. Return deactivated HydraHead
+
+### 4.4 Query UTxO
+
+**Flow:**
+1. Client gọi `GET /hydra-main/utxo/:address`
+2. `HydraMainService.getAddressUtxo()`:
+   - Gọi `OgmiosClientService.queryUtxo()`
+   - Convert Ogmios format sang internal format
+   - Return UTxO data
+
+---
+
+## 5. Configuration & Environment
+
+### 5.1 Environment Variables
+
+```bash
+# Hydra Configuration
+NEST_HYDRA_NODE_IMAGE=ghcr.io/cardano-scaling/hydra-node:0.22.2
+NEST_HYDRA_NODE_FOLDER=/path/to/hydra/data
+NEST_HYDRA_BIN_DIR_PATH=/path/to/hydra/bin
+NEST_HYDRA_NODE_SCRIPT_TX_ID=<script-tx-id>
+NEST_HYDRA_NODE_NETWORK_ID=1  # 1=preprod, 764824073=mainnet
+
+# Cardano Node Configuration
+NEST_CARDANO_NODE_SERVICE_NAME=cardano-node
+NEST_CARDANO_NODE_IMAGE=ghcr.io/intersectmbo/cardano-node:10.1.4
+NEST_CARDANO_NODE_FOLDER=/path/to/cardano/node
+NEST_CARDANO_NODE_SOCKET_PATH=/path/to/cardano/node/node.socket
+
+# Docker Configuration
+NEST_DOCKER_SOCKET_PATH=/var/run/docker.sock  # Linux/Mac
+# NEST_DOCKER_SOCKET_PATH=//./pipe/docker_engine  # Windows
+NEST_DOCKER_ENABLE_NETWORK_HOST=false
+
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=3306
+DB_USERNAME=root
+DB_PASSWORD=password
+DB_DATABASE=hydra_hexcore
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Ogmios Configuration
+OGMIOS_HOST=localhost
+OGMIOS_PORT=1337
+
+# Account Settings
+ACCOUNT_MIN_LOVELACE=50000000  # 50 ADA minimum
+
+# JWT Configuration
+JWT_SECRET=your-secret-key
+JWT_EXPIRES_IN=24h
+```
+
+### 5.2 Hydra Configuration Module
+
+File: `src/config/hydra.config.ts`
+
+```typescript
+export interface HydraConfigInterface {
+  hydraNodeImage: string;
+  hydraNodeFolder: string;
+  hydraBinDirPath: string;
+  hydraNodeScriptTxId: string;
+  hydraNodeNetworkId: string;
+  cardanoNodeServiceName: string;
+  cardanoNodeImage: string;
+  cardanoNodeFolder: string;
+  cardanoNodeSocketPath: string;
+  enableNetworkHost: boolean;
+  dockerSock: string;
+  accountMinLovelace: number;
+}
+```
+
+---
+
+## 6. API Reference
+
+### 6.1 Authentication
+
+#### Login
+```http
+POST /hydra-main/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "password"
+}
+
+Response:
+{
+  "accessToken": "eyJhbGc..."
+}
 
   @Column()
   name: string;
 
-  @Column({
-    type: 'enum',
-    enum: ConsumerStatus,
-    default: ConsumerStatus.ACTIVE
-  })
-  status: ConsumerStatus;
+  @Column({ unique: true })
+  address: string;
 
-  @Column()
-  apiKey: string;
-
-  @ManyToMany(() => HydraNode)
-  @JoinTable()
-  nodes: HydraNode[];
+  @Column({ type: 'text' })
+  mnemonic: string; // Encrypted
 
   @CreateDateColumn()
   createdAt: Date;
@@ -844,86 +1155,6 @@ export class Consumer {
   updatedAt: Date;
 }
 ```
-
-**`ConsumerKeyMapper.entity.ts`** - Map consumer key to node URLs
-```typescript
-@Entity('consumer_key_mappers')
-export class ConsumerKeyMapper {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ unique: true })
-  consumerKey: string;
-
-  @Column()
-  url: string; // Hydra node endpoint
-
-  @ManyToOne(() => Consumer)
-  consumer: Consumer;
-}
-```
-
-### 3.4 Module `proxy/`
-
-Module proxy WebSocket connections từ UI tới Hydra nodes.
-
-**`WsProxyGateway`**
-```typescript
-@WebSocketGateway({
-  namespace: '/ws/proxy',
-  cors: { origin: '*' }
-})
-export class WsProxyGateway {
-  @SubscribeMessage('connect-to-node')
-  async handleProxyConnection(
-    client: Socket,
-    payload: { nodeUrl: string }
-  ) {
-    // Tạo WebSocket connection tới Hydra node
-    const ws = new WebSocket(payload.nodeUrl);
-    
-    // Forward messages bidirectionally
-    ws.on('message', (data) => {
-      client.emit('node-message', data);
-    });
-    
-    client.on('client-message', (data) => {
-      ws.send(data);
-    });
-  }
-}
-```
-
-**Use case:**
-- UI không connect trực tiếp tới Hydra node
-- Backend làm proxy để quản lý connections
-- Có thể log, filter, transform messages
-
-### 3.5 Module `shell/`
-
-Module thực thi shell commands, chủ yếu để chạy Cardano CLI.
-
-**`ShellService`**
-```typescript
-@Injectable()
-export class ShellService {
-  executeShellScript(scriptPath: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      exec(`bash ${scriptPath}`, (error, stdout, stderr) => {
-        if (error) reject(`Error: ${error.message}`);
-        else if (stderr) reject(`Stderr: ${stderr}`);
-        else resolve(stdout);
-      });
-    });
-  }
-  
-  executeCommand(command: string): Promise<string> {
-    // Execute arbitrary shell command
-  }
-}
-```
-
-**Security Note:** ⚠️ Cần validate input cẩn thận để tránh command injection.
 
 ### 3.6 Module `utils/`
 

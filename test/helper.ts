@@ -19,13 +19,6 @@ export async function generateAdminTest() {
     }
 }
 
-export async function generateConsumerTest() {
-    return {
-        address: 'consumer_test',
-        password: 'StrongPassword123!',
-    }
-}
-
 export async function insertAdminAccount(data: { username: string; password: string }, dataSource: DataSource) {
     const userRepository = dataSource.getRepository('User');
     const user = userRepository.create({
@@ -34,16 +27,6 @@ export async function insertAdminAccount(data: { username: string; password: str
         role: 'admin',
     });
     await userRepository.save(user);
-}
-
-export async function insertConsumerAccount(data: { address: string; password: string; status: StatusConsumer }, dataSource: DataSource) {
-    const consumerRepository = dataSource.getRepository('Consumer');
-    const consumer = consumerRepository.create({
-        address: data.address,
-        password: data.password,
-        status: data.status,
-    });
-    await consumerRepository.save(consumer);
 }
 
 export async function insertAccount(mnemonic: string, dataSource: DataSource) {

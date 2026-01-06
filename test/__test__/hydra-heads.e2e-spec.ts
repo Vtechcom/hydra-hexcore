@@ -7,16 +7,14 @@ import { DataSource } from 'typeorm';
 import { INestApplication } from '@nestjs/common';
 import { cleanupTestApp, createHydraHeadTestApp } from 'test/setup';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import request from 'supertest';
 import { clearDatabase, createAdminAccountAndGetToken } from 'test/helper';
 import { JwtService } from '@nestjs/jwt';
 import { DockerService } from '../../src/docker/docker.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
-// Make fs.promises methods mockable in tests. The real exports on Node's
-// `node:fs/promises` can be non-configurable which causes jest.spyOn to
-// throw "Cannot redefine property". Mock the module so the methods are
-// jest.fn() and can be controlled in individual tests.
+// Mock both node:fs and node:fs/promises modules used by HydraHeadService
 jest.mock('node:fs/promises', () => {
     const real = jest.requireActual('node:fs/promises');
     return {
@@ -26,7 +24,6 @@ jest.mock('node:fs/promises', () => {
     };
 });
 
-// Also mock node:fs for sync operations
 jest.mock('node:fs', () => {
     const real = jest.requireActual('node:fs');
     return {
@@ -69,7 +66,16 @@ describe('Hydra Head Service(e2e)', () => {
 
         const hydraHeadService = moduleFixture.get(HydraHeadService);
 
-        jest.spyOn(hydraHeadService, 'checkUtxoAccount').mockResolvedValue(true);
+        // Mock file system operations
+        (fs.access as unknown as jest.Mock).mockResolvedValue(undefined);
+        (fs.mkdir as unknown as jest.Mock).mockResolvedValue(undefined);
+        (fsSync.writeFileSync as unknown as jest.Mock).mockReturnValue(undefined);
+        (fsSync.chmodSync as unknown as jest.Mock).mockReturnValue(undefined);
+
+        // Mock checkUtxoAccount to always return true (sufficient balance)
+        jest
+        .spyOn(hydraHeadService, 'checkUtxoAccount')
+        .mockResolvedValue(true);
     }, 30000);
 
     afterEach(async () => {
@@ -78,6 +84,12 @@ describe('Hydra Head Service(e2e)', () => {
         // the spy on hydraHeadService.checkUtxoAccount, causing the active
         // test to call the real implementation and hit the converter.
         jest.clearAllMocks();
+        
+        // Re-setup default fs mocks after clearing
+        (fs.access as unknown as jest.Mock).mockResolvedValue(undefined);
+        (fs.mkdir as unknown as jest.Mock).mockResolvedValue(undefined);
+        (fsSync.writeFileSync as unknown as jest.Mock).mockReturnValue(undefined);
+        (fsSync.chmodSync as unknown as jest.Mock).mockReturnValue(undefined);
     });
 
     afterAll(async () => {

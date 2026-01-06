@@ -216,36 +216,5 @@ describe('Account Management (e2e)', () => {
                 .set('Authorization', 'Bearer invalid_token_abc')
                 .expect(401);
         });
-
-        it('should fail to list accounts with consumer token', async () => {
-            // Consumer không được phép access admin endpoints
-            const { generateConsumerTest, insertConsumerAccount, StatusConsumerType } = await import('../helper');
-            
-            // Tạo consumer với unique address để tránh duplicate
-            const consumerDto = {
-                address: `consumer_account_test_${Date.now()}`,
-                password: 'StrongPassword123!',
-            };
-            
-            await insertConsumerAccount(
-                {
-                    ...consumerDto,
-                    status: StatusConsumerType.ACTIVE,
-                },
-                dataSource
-            );
-
-            const consumerLoginResponse = await request(app.getHttpServer())
-                .post('/hydra-consumer/consumer/login')
-                .send(consumerDto)
-                .expect(201);
-
-            const consumerToken = consumerLoginResponse.body.accessToken;
-
-            await request(app.getHttpServer())
-                .get('/hydra-main/list-account')
-                .set('Authorization', `Bearer ${consumerToken}`)
-                .expect(401);
-        });
     });
 });
