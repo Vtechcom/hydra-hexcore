@@ -18,7 +18,8 @@
         "test:cov": "jest --coverage",
         "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
         "test:e2e": "jest --config ./test/jest-e2e.json",
-        "typeorm": "typeorm-ts-node-esm"
+        "typeorm": "typeorm-ts-node-esm",
+        "seed:run": "npx ts-node -r tsconfig-paths/register src/migrations/seeders/run-seeder.ts"
     },
     "dependencies": {
         "@cardano-ogmios/client": "^6.13.0",
@@ -50,6 +51,7 @@
         "class-transformer": "^0.5.1",
         "class-validator": "^0.14.1",
         "dockerode": "^4.0.2",
+        "dotenv": "^17.2.3",
         "http-proxy-middleware": "^3.0.3",
         "mysql2": "^3.14.0",
         "nest-winston": "^1.10.2",
