@@ -5,7 +5,6 @@ export class ResCardanoAccountDto {
 
   baseAddress: string;
 
-  @Exclude()
   mnemonic: string;
 
   createdAt: string;
