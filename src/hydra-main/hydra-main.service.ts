@@ -28,6 +28,7 @@ import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { resolveHydraNodeName } from './utils/name-resolver';
 import { OgmiosClientService } from './ogmios-client.service';
 import { convertUtxoToUTxOObject } from './utils/ogmios-converter';
+import { ProviderUtils } from '@hydra-sdk/core';
 
 type ContainerNode = {
     hydraNodeId: string;
@@ -738,6 +739,24 @@ export class HydraMainService implements OnModuleInit {
                 console.error(`Error cleaning up container:`, error.message);
                 throw error;
             }
+        }
+    }
+
+    /**
+     * Get utxo of an address from blockfrost
+     */
+    async getAddressUtxoBlockfrost(address: string) {
+        try {
+            const provider = new ProviderUtils.BlockfrostProvider({
+                apiKey: process.env.BLOCKFROST_PROJECT_ID,
+                network: 'preprod',
+            });
+            const utxos = await provider.fetcher.fetchAddressUTxOs(address);
+            console.log('>>> / file: hydra-main.service.ts:1156 / utxos:', utxos);
+            return utxos;
+        } catch (err) {
+            console.log(`[Error getAddressUtxoBlockfrost] [${address}] `, err);
+            throw err;
         }
     }
 }

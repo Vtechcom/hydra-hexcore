@@ -117,4 +117,10 @@ export class HydraMainController {
     getActiveNodes() {
         return this.hydraMainService.getActiveNodeContainers();
     }
+
+    @ApiOperation({ summary: 'Get address UTXO from Blockfrost' })
+    @Get('utxo-blockfrost/:address')
+    async getAddressUtxoBlockfrost(@Param('address') address: string) {
+        return this.hydraMainService.getAddressUtxoBlockfrost(address);
+    }
 }

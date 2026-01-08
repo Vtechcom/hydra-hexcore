@@ -229,10 +229,6 @@ export class HydraHeadService {
             ],
         });
         const protocolParameters = JSON.parse(Buffer.from(output).toString());
-        protocolParameters.txFeeFixed = 0;
-        protocolParameters.txFeePerByte = 0;
-        protocolParameters.executionUnitPrices.priceMemory = 0;
-        protocolParameters.executionUnitPrices.priceSteps = 0;
         await this.writeFile(
             `${headDirPath}/protocol-parameters.json`,
             JSON.stringify({
@@ -356,6 +352,9 @@ export class HydraHeadService {
             // All containers started successfully
             head.status = 'running';
             await this.hydraHeadRepository.save(head);
+
+            // Update Redis cache - add newly activated nodes
+            await this.updateRedisActiveNodes(head, createdContainers);
         } catch (error: any) {
             // If any container fails, cleanup all created containers
             this.logger.error(`Error activating head ${head.id}: ${error.message}`);
@@ -588,6 +587,34 @@ export class HydraHeadService {
             throw new NotFoundException('Hydra Head not found');
         }
 
+        // Get active nodes from Redis
+        const activeNodesCache = await this.cacheManager.get<Caching['activeNodes']>('activeNodes');
+        const activeNodes = activeNodesCache || [];
+
+        // Check if all nodes of this head are active in Redis
+        const inactiveNodes = [];
+        for (const node of head.hydraNodes) {
+            const isNodeActive = activeNodes.some(
+                activeNode =>
+                    activeNode.hydraNodeId === node.id.toString() &&
+                    activeNode.hydraHeadId === head.id.toString() &&
+                    activeNode.isActive === true,
+            );
+
+            if (!isNodeActive) {
+                const nodeName = this.getDockerContainerName(node);
+                inactiveNodes.push(nodeName);
+            }
+        }
+
+        if (inactiveNodes.length > 0) {
+            throw new BadRequestException(
+                `Cannot restart Hydra Head ${id}: The following nodes are not active: ${inactiveNodes.join(', ')}. ` +
+                    `Please ensure all nodes are running before restarting the head.`,
+            );
+        }
+
+        // All nodes are active, proceed with restart
         try {
             await Promise.all(
                 head.hydraNodes.map(node => {
@@ -600,7 +627,51 @@ export class HydraHeadService {
         }
 
         return {
-            message: `Hydra Head ${id} containers have been restarted.`,
+            message: `Hydra Head ${id} containers have been restarted successfully.`,
         };
+    }
+
+    /**
+     * Update Redis cache by adding newly activated nodes
+     * Similar to updateHydraContainerStatus but only adds new nodes
+     */
+    private async updateRedisActiveNodes(head: HydraHead, containers: Docker.Container[]): Promise<void> {
+        try {
+            // Get current active nodes from Redis
+            const currentActiveNodes = (await this.cacheManager.get<Caching['activeNodes']>('activeNodes')) || [];
+
+            // Get container info for newly created containers
+            const newActiveNodes = await Promise.all(
+                containers.map(async container => {
+                    const containerInfo = await container.inspect();
+                    if (!containerInfo.State.Running) {
+                        throw new Error(`Container ${containerInfo.Name} is not running after activation.`);
+                    }
+                    return {
+                        hydraNodeId: containerInfo.Config.Labels[this.hydraConfig.hydraNodeLabel],
+                        hydraHeadId: containerInfo.Config.Labels[this.hydraConfig.hydraHeadLabel],
+                        container: containerInfo as unknown as Docker.ContainerInfo,
+                        isActive: containerInfo.State.Running,
+                    };
+                }),
+            );
+
+            // Filter out any nodes that already exist in cache (by hydraNodeId)
+            const existingNodeIds = currentActiveNodes.map(node => node.hydraNodeId);
+            const nodesToAdd = newActiveNodes.filter(node => !existingNodeIds.includes(node.hydraNodeId));
+
+            // Merge with existing active nodes
+            const updatedActiveNodes = [...currentActiveNodes, ...nodesToAdd];
+
+            // Update Redis cache
+            await this.cacheManager.set<Caching['activeNodes']>('activeNodes', updatedActiveNodes);
+
+            this.logger.log(
+                `Updated Redis cache: Added ${nodesToAdd.length} new active nodes for Head ${head.id}. ` +
+                    `Active nodes: ${updatedActiveNodes}`,
+            );
+        } catch (error: any) {
+            throw error;
+        }
     }
 }

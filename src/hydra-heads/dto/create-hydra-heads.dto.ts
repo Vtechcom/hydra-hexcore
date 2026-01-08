@@ -49,6 +49,12 @@ export class CreateHydraHeadsDto {
     example: {
       maxTxSize: 16384,
       maxBlockBodySize: 65536,
+      txFeeFixed: 0,
+      txFeePerByte: 44,
+      executionUnitPrices: {
+        priceMemory: 0.0577,
+        priceSteps: 0.0000721,
+      },
     },
   })
   @IsOptional()
