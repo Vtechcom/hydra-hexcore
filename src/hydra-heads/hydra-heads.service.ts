@@ -26,6 +26,7 @@ import { Caching } from 'src/common/interfaces/cache.type';
 import { ClearHeadDataDto } from './dto/clear-head-data.dto';
 import { HYDRA_CONFIG, HydraConfigInterface } from 'src/config/hydra.config';
 import { CARDANO_SK, CARDANO_VK, HYDRA_SK, HYDRA_VK } from './contants/type-key.contants';
+import { ProviderUtils } from '@hydra-sdk/core';
 
 @Injectable()
 export class HydraHeadService {
@@ -141,11 +142,37 @@ export class HydraHeadService {
         return activeNodes;
     }
 
-    async countActiveNodes(): Promise<number> {
+    async checkNodesActiveHydraHead(hydraNodes: HydraNode[]): Promise<void> {
         // Get active nodes from cache (updated by cron job every 10 seconds)
         // This is more accurate than querying database as it reflects actual running containers
         const activeNodes = await this.getActiveNodeContainers();
-        return activeNodes.length;
+
+        // Check nodes active
+        const activeNode = hydraNodes.filter(node =>
+            activeNodes.some(active => active.hydraNodeId === node.id.toString()),
+        );
+        console.log('Active nodes for head check:', activeNode);
+
+        if (activeNode.length >= hydraNodes.length) {
+            throw new BadRequestException('Head has already started');
+        }
+
+        const nodesToAdd = hydraNodes.length;
+        const currentActiveNodesCount = activeNodes.length;
+
+        const maxActiveNodes = this.hydraConfig.maxActiveNodes || 20;
+
+        console.log('maxActiveNodes', maxActiveNodes, 'currentActiveNodesCount', currentActiveNodesCount, 'nodesToAdd', nodesToAdd);
+        if (currentActiveNodesCount + nodesToAdd > maxActiveNodes) {
+            this.logger.error(
+                `Cannot activate head: would exceed maximum active nodes limit (${maxActiveNodes}). ` +
+                    `Current active: ${currentActiveNodesCount}, attempting to add: ${nodesToAdd}`,
+            );
+            throw new BadRequestException(
+                `Cannot activate head: maximum active nodes limit (${maxActiveNodes}) would be exceeded. ` +
+                    `Current active nodes: ${currentActiveNodesCount}, nodes to add: ${nodesToAdd}`,
+            );
+        }
     }
 
     async createHydraNode(head: HydraHead, account: Account, hydraHeadKey: HydraHeadKeys): Promise<HydraNode> {
@@ -163,7 +190,7 @@ export class HydraHeadService {
         return newHydraNode;
     }
 
-    async activeHydraHead(activeHeadDto: ActiveHydraHeadsDto): Promise<HydraHead> {
+    async activeHydraHead(activeHeadDto: ActiveHydraHeadsDto) {
         console.log('Load hydra config: ', this.hydraConfig);
         const headId = activeHeadDto.id;
         const head = await this.hydraHeadRepository
@@ -178,21 +205,7 @@ export class HydraHeadService {
             throw new BadRequestException('Invalid Head Id');
         }
 
-        // Check if adding this head would exceed max active nodes limit
-        const currentActiveNodesCount = await this.countActiveNodes();
-        const nodesToAdd = head.hydraNodes.length;
-        const maxActiveNodes = this.hydraConfig.maxActiveNodes || 20;
-
-        if (currentActiveNodesCount + nodesToAdd > maxActiveNodes) {
-            this.logger.error(
-                `Cannot activate head: would exceed maximum active nodes limit (${maxActiveNodes}). ` +
-                    `Current active: ${currentActiveNodesCount}, attempting to add: ${nodesToAdd}`,
-            );
-            throw new BadRequestException(
-                `Cannot activate head: maximum active nodes limit (${maxActiveNodes}) would be exceeded. ` +
-                    `Current active nodes: ${currentActiveNodesCount}, nodes to add: ${nodesToAdd}`,
-            );
-        }
+        await this.checkNodesActiveHydraHead(head.hydraNodes);
 
         // if (head.status === 'ACTIVE') {
         //     throw new BadRequestException('Head is already active');
@@ -475,10 +488,22 @@ export class HydraHeadService {
         });
     }
 
-    async checkUtxoAccount(enterpriseAddress: string): Promise<boolean> {
+    async checkUtxoAccount(enterpriseAddress: string) {
         this.logger.log(`Checking UTXO for address: ${enterpriseAddress}`);
-        const a_utxo = await this.getAddressUtxo(enterpriseAddress);
-        const totalLovelace = Object.values(a_utxo).reduce((sum, item) => sum + item.value.lovelace, 0);
+        const provider = new ProviderUtils.BlockfrostProvider({
+            apiKey: process.env.BLOCKFROST_PROJECT_ID,
+            network: 'preprod',
+        });
+        const utxo = await provider.fetcher.fetchAddressUTxOs(enterpriseAddress);
+
+        const totalLovelace = Object.values(utxo).reduce((sum, item) => {
+            const lovelaceUtxo = item.output.amount.reduce(
+                (acc: bigint, atm) => (atm.unit === 'lovelace' ? acc + BigInt(atm.quantity) : acc),
+                0n,
+            );
+            return sum + lovelaceUtxo;
+        }, 0n);
+        // const a_utxo = await this.getAddressUtxo(enterpriseAddress);
         console.log(`[${enterpriseAddress}]:[${totalLovelace} lovelace]`);
         console.log(
             `Total lovelace: ${totalLovelace}, Required minimum: ${this.hydraConfig.cardanoAccountMinLovelace}`,
