@@ -10,6 +10,8 @@ import { OgmiosClientService } from 'src/hydra-main/ogmios-client.service';
 import { jwtConstants } from 'src/constants';
 import { DockerModule } from 'src/docker/docker.module';
 import { HydraConfig } from 'src/config/hydra.config';
+import { AxiosModule } from 'src/axios';
+import { BlockFrostApiService } from 'src/blockfrost/blockfrost-api.service';
 
 @Module({
     imports: [
@@ -19,8 +21,9 @@ import { HydraConfig } from 'src/config/hydra.config';
             signOptions: { expiresIn: '1day' },
         }),
         DockerModule,
+        AxiosModule,
     ],
-    providers: [HydraHeadService, OgmiosClientService, HydraConfig],
+    providers: [HydraHeadService, OgmiosClientService, HydraConfig, BlockFrostApiService,],
     controllers: [HydraHeadController],
     exports: [HydraHeadService, HydraConfig],
 })
