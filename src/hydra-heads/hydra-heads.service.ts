@@ -13,7 +13,6 @@ import { chmodSync, writeFileSync } from 'node:fs';
 import { resolveHydraNodeName } from 'src/hydra-main/utils/name-resolver';
 import { generateKeyFile } from 'src/utils/generator.util';
 import { ActiveHydraHeadsDto } from './dto/active-hydra-heads.dto';
-import { CardanoCliJs } from 'cardanocli-js';
 import Docker from 'dockerode';
 import { DockerService } from 'src/docker/docker.service';
 import { convertUtxoToUTxOObject } from 'src/hydra-main/utils/ogmios-converter';
@@ -27,6 +26,7 @@ import { ClearHeadDataDto } from './dto/clear-head-data.dto';
 import { HYDRA_CONFIG, HydraConfigInterface } from 'src/config/hydra.config';
 import { CARDANO_SK, CARDANO_VK, HYDRA_SK, HYDRA_VK } from './contants/type-key.contants';
 import { ProviderUtils } from '@hydra-sdk/core';
+import { BlockFrostApiService } from 'src/blockfrost/blockfrost-api.service';
 
 @Injectable()
 export class HydraHeadService {
@@ -44,6 +44,7 @@ export class HydraHeadService {
         private readonly ogmiosClientService: OgmiosClientService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         @Inject(HYDRA_CONFIG) private readonly hydraConfig: HydraConfigInterface,
+        private readonly blockfrostApiService: BlockFrostApiService,
     ) {}
 
     async create(body: CreateHydraHeadsDto) {
@@ -162,7 +163,14 @@ export class HydraHeadService {
 
         const maxActiveNodes = this.hydraConfig.maxActiveNodes || 20;
 
-        console.log('maxActiveNodes', maxActiveNodes, 'currentActiveNodesCount', currentActiveNodesCount, 'nodesToAdd', nodesToAdd);
+        console.log(
+            'maxActiveNodes',
+            maxActiveNodes,
+            'currentActiveNodesCount',
+            currentActiveNodesCount,
+            'nodesToAdd',
+            nodesToAdd,
+        );
         if (currentActiveNodesCount + nodesToAdd > maxActiveNodes) {
             this.logger.error(
                 `Cannot activate head: would exceed maximum active nodes limit (${maxActiveNodes}). ` +
@@ -224,24 +232,10 @@ export class HydraHeadService {
         }
         const headDirPath = resolveHeadDirPath(head.id, this.hydraConfig.hydraNodeFolder);
 
-        // generate protocol-parameters.json
-        const cardanoCli = new CardanoCliJs({
-            cliPath: `docker exec cardano-node cardano-cli`,
-            dir: `/workspace`,
-            era: '',
-            network: '1',
-            socketPath: '/workspace/node.socket',
-            shelleyGenesis: '/workspace/shelley-genesis.json',
-        });
-        const output = await cardanoCli.runCommand({
-            command: 'query',
-            subcommand: 'protocol-parameters',
-            parameters: [
-                { name: 'socket-path', value: '/workspace/node.socket' },
-                { name: 'testnet-magic', value: '1' },
-            ],
-        });
-        const protocolParameters = JSON.parse(Buffer.from(output).toString());
+        // Get protocol parameters from Blockfrost API
+        const blockfrostParams = await this.blockfrostApiService.getProtocolParameters();
+        this.logger.error(`Fetched protocol parameters from Blockfrost: ${JSON.stringify(blockfrostParams)}`);
+        const protocolParameters = this.convertBlockfrostToCardanoCliFormat(blockfrostParams);
         await this.writeFile(
             `${headDirPath}/protocol-parameters.json`,
             JSON.stringify({
@@ -317,8 +311,8 @@ export class HydraHeadService {
                         '--deposit-period', head.depositPeriod + 's',
                         '--contestation-period', head.contestationPeriod + 's',
                         
-                        '--testnet-magic', `${this.hydraConfig.hydraNodeNetworkId}`,
-                        '--node-socket', `/cardano-node/node.socket`,
+                        // '--testnet-magic', `${this.hydraConfig.hydraNodeNetworkId}`,
+                        '--blockfrost', '/cardano-node/blockfrost-project.txt',
                         '--ledger-protocol-parameters', `/data/head-${head.id}/protocol-parameters.json`,
                     ],
                     HostConfig: {
@@ -397,6 +391,90 @@ export class HydraHeadService {
             ...head,
             // status: status ? 'ACTIVE' : 'INACTIVE',
         };
+    }
+
+    private convertBlockfrostToCardanoCliFormat(blockfrostParams: any) {
+        const hydraParams = {
+            collateralPercentage: blockfrostParams.collateral_percent,
+            committeeMaxTermLength: parseInt(blockfrostParams.committee_max_term_length),
+            committeeMinSize: parseInt(blockfrostParams.committee_min_size),
+
+            // Use cost_models_raw (array format) instead of cost_models (object format)
+            costModels: {
+                PlutusV1: blockfrostParams.cost_models_raw?.PlutusV1 || [],
+                PlutusV2: blockfrostParams.cost_models_raw?.PlutusV2 || [],
+                PlutusV3: blockfrostParams.cost_models_raw?.PlutusV3 || [],
+            },
+
+            dRepActivity: parseInt(blockfrostParams.drep_activity),
+            dRepDeposit: parseInt(blockfrostParams.drep_deposit),
+
+            dRepVotingThresholds: {
+                committeeNoConfidence: blockfrostParams.dvt_committee_no_confidence,
+                committeeNormal: blockfrostParams.dvt_committee_normal,
+                hardForkInitiation: blockfrostParams.dvt_hard_fork_initiation,
+                motionNoConfidence: blockfrostParams.dvt_motion_no_confidence,
+                ppEconomicGroup: blockfrostParams.dvt_p_p_economic_group,
+                ppGovGroup: blockfrostParams.dvt_p_p_gov_group,
+                ppNetworkGroup: blockfrostParams.dvt_p_p_network_group,
+                ppTechnicalGroup: blockfrostParams.dvt_p_p_technical_group,
+                treasuryWithdrawal: blockfrostParams.dvt_treasury_withdrawal,
+                updateToConstitution: blockfrostParams.dvt_update_to_constitution,
+            },
+
+            executionUnitPrices: {
+                priceSteps: parseFloat(blockfrostParams.price_step),
+                priceMemory: parseFloat(blockfrostParams.price_mem),
+            },
+
+            govActionDeposit: parseInt(blockfrostParams.gov_action_deposit),
+            govActionLifetime: parseInt(blockfrostParams.gov_action_lifetime),
+            maxBlockBodySize: blockfrostParams.max_block_size,
+
+            maxBlockExecutionUnits: {
+                memory: parseInt(blockfrostParams.max_block_ex_mem),
+                steps: parseInt(blockfrostParams.max_block_ex_steps),
+            },
+
+            maxBlockHeaderSize: blockfrostParams.max_block_header_size,
+            maxCollateralInputs: blockfrostParams.max_collateral_inputs,
+
+            maxTxExecutionUnits: {
+                memory: parseInt(blockfrostParams.max_tx_ex_mem),
+                steps: parseInt(blockfrostParams.max_tx_ex_steps),
+            },
+
+            maxTxSize: blockfrostParams.max_tx_size,
+            maxValueSize: parseInt(blockfrostParams.max_val_size),
+            minFeeRefScriptCostPerByte: blockfrostParams.min_fee_ref_script_cost_per_byte,
+            minPoolCost: parseInt(blockfrostParams.min_pool_cost),
+            monetaryExpansion: parseFloat(blockfrostParams.rho),
+            poolPledgeInfluence: parseFloat(blockfrostParams.a0),
+            poolRetireMaxEpoch: blockfrostParams.e_max,
+
+            poolVotingThresholds: {
+                committeeNoConfidence: blockfrostParams.pvt_committee_no_confidence,
+                committeeNormal: blockfrostParams.pvt_committee_normal,
+                hardForkInitiation: blockfrostParams.pvt_hard_fork_initiation,
+                motionNoConfidence: blockfrostParams.pvt_motion_no_confidence,
+                ppSecurityGroup: blockfrostParams.pvt_p_p_security_group,
+            },
+
+            protocolVersion: {
+                major: blockfrostParams.protocol_major_ver,
+                minor: blockfrostParams.protocol_minor_ver,
+            },
+
+            stakeAddressDeposit: parseInt(blockfrostParams.key_deposit),
+            stakePoolDeposit: parseInt(blockfrostParams.pool_deposit),
+            stakePoolTargetNum: blockfrostParams.n_opt,
+            treasuryCut: parseFloat(blockfrostParams.tau),
+            txFeeFixed: blockfrostParams.min_fee_b,
+            txFeePerByte: blockfrostParams.min_fee_a,
+            utxoCostPerByte: parseInt(blockfrostParams.coins_per_utxo_size),
+        };
+
+        return hydraParams;
     }
 
     async deactiveHydraHead(activeHeadDto: ActiveHydraHeadsDto): Promise<HydraHead> {
