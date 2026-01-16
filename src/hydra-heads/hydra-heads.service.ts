@@ -79,6 +79,10 @@ export class HydraHeadService {
                 await chmodSync(headDirPath, 0o775);
             }
 
+            //create blockfrost project id file
+            const blockfrostFilePath = `${headDirPath}/blockfrost-project.txt`;
+            await this.writeFile(blockfrostFilePath, body.blockfrostProjectId);
+
             // create nodes for the head
             const nodes = [];
             for (const hydraHeadKey of body.hydraHeadKeys) {
@@ -312,7 +316,7 @@ export class HydraHeadService {
                         '--contestation-period', head.contestationPeriod + 's',
                         
                         // '--testnet-magic', `${this.hydraConfig.hydraNodeNetworkId}`,
-                        '--blockfrost', '/cardano-node/blockfrost-project.txt',
+                        '--blockfrost', `/data/head-${head.id}/blockfrost-project.txt`, 
                         '--ledger-protocol-parameters', `/data/head-${head.id}/protocol-parameters.json`,
                     ],
                     HostConfig: {

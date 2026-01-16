@@ -21,6 +21,13 @@ export class CreateHydraHeadsDto {
   hydraHeadKeys: HydraHeadKeys[];
 
   @ApiProperty({
+    description: 'Blockfrost project ID',
+    example: 'blockfrost_project_id_example',
+  })
+  @IsString()
+  blockfrostProjectId?: string;
+
+  @ApiProperty({
     description: 'Contestation period',
     example: 120,
   })

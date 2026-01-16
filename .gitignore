@@ -2,12 +2,12 @@
 /dist
 /node_modules
 /build
-*/database
+*/*/database
 /hydra
 /cardano-node
 package-log.json
 yarn.lock
-*/db
+*/*/db
 
 # Logs
 logs
