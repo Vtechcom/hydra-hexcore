@@ -13,6 +13,7 @@ import { chmodSync, writeFileSync } from 'node:fs';
 import { resolveHydraNodeName } from 'src/hydra-main/utils/name-resolver';
 import { generateKeyFile } from 'src/utils/generator.util';
 import { ActiveHydraHeadsDto } from './dto/active-hydra-heads.dto';
+import { CardanoCliJs } from 'cardano-cli-js';
 import Docker from 'dockerode';
 import { DockerService } from 'src/docker/docker.service';
 import { convertUtxoToUTxOObject } from 'src/hydra-main/utils/ogmios-converter';
@@ -236,9 +237,32 @@ export class HydraHeadService {
         }
         const headDirPath = resolveHeadDirPath(head.id, this.hydraConfig.hydraNodeFolder);
 
-        // Get protocol parameters from Blockfrost API
-        const blockfrostParams = await this.blockfrostApiService.getProtocolParameters();
-        const protocolParameters = this.convertBlockfrostToCardanoCliFormat(blockfrostParams);
+        let protocolParameters: any;
+        if (process.env.CONNECT_CARDANO === 'cardano-node') {
+            // generate protocol-parameters.json from cardano-node
+            const cardanoCli = new CardanoCliJs({
+                cliPath: `docker exec cardano-node cardano-cli`,
+                dir: `/workspace`,
+                era: '',
+                network: '1',
+                socketPath: '/workspace/node.socket',
+                shelleyGenesis: '/workspace/shelley-genesis.json',
+            });
+            const output = await cardanoCli.runCommand({
+                command: 'query',
+                subcommand: 'protocol-parameters',
+                parameters: [
+                    { name: 'socket-path', value: '/workspace/node.socket' },
+                    { name: 'testnet-magic', value: '1' },
+                ],
+            });
+            protocolParameters = JSON.parse(Buffer.from(output).toString());
+        } else {
+            // Get protocol parameters from Blockfrost API
+            const blockfrostParams = await this.blockfrostApiService.getProtocolParameters();
+            protocolParameters = this.convertBlockfrostToCardanoCliFormat(blockfrostParams);
+        }
+
         await this.writeFile(
             `${headDirPath}/protocol-parameters.json`,
             JSON.stringify({
@@ -314,8 +338,13 @@ export class HydraHeadService {
                         '--deposit-period', head.depositPeriod + 's',
                         '--contestation-period', head.contestationPeriod + 's',
                         
-                        // '--testnet-magic', `${this.hydraConfig.hydraNodeNetworkId}`,
-                        '--blockfrost', `/data/head-${head.id}/blockfrost-project.txt`, 
+                        ...(process.env.CONNECT_CARDANO === 'cardano-node'
+                            ? [
+                                '--testnet-magic', `${this.hydraConfig.hydraNodeNetworkId}`, 
+                                '--node-socket', `/cardano-node/node.socket`
+                            ]
+                            : ['--blockfrost', `/data/head-${head.id}/blockfrost-project.txt`]
+                        ),
                         '--ledger-protocol-parameters', `/data/head-${head.id}/protocol-parameters.json`,
                     ],
                     HostConfig: {
