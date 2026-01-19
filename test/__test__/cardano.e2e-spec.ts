@@ -105,13 +105,13 @@ describe('Cardano Integration (e2e)', () => {
         });
 
         it('should handle UTXO query when no UTXOs exist', async () => {
-            const response = await request(app.getHttpServer()).get(`/hydra-main/utxo/${testAddress}`).expect(400);
+            await request(app.getHttpServer()).get(`/hydra-main/utxo/${testAddress}`).expect(400);
         });
 
         it('should handle invalid address format', async () => {
             const invalidAddress = 'invalid_address_format';
 
-            const response = await request(app.getHttpServer()).get(`/hydra-main/utxo/${invalidAddress}`).expect(400);
+            await request(app.getHttpServer()).get(`/hydra-main/utxo/${invalidAddress}`).expect(400);
         });
 
         it('should handle empty address', async () => {

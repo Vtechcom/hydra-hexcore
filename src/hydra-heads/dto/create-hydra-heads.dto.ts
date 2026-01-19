@@ -31,7 +31,7 @@ export class CreateHydraHeadsDto {
         example: 'blockfrost_project_id_example',
     })
     @IsString()
-    blockfrostProjectId?: string;
+    blockfrostProjectId: string;
 
     @ApiProperty({
         description: 'Contestation period',

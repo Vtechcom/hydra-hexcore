@@ -29,6 +29,7 @@ import { resolveHydraNodeName } from './utils/name-resolver';
 import { OgmiosClientService } from './ogmios-client.service';
 import { convertUtxoToUTxOObject } from './utils/ogmios-converter';
 import { ProviderUtils } from '@hydra-sdk/core';
+import { ConfigService } from '@nestjs/config';
 
 type ContainerNode = {
     hydraNodeId: string;
@@ -96,6 +97,7 @@ export class HydraMainService implements OnModuleInit {
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
         private ogmiosClientService: OgmiosClientService,
+        private configService: ConfigService,
     ) {
         const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
         this.docker = new Docker({ socketPath: DOCKER_SOCKET });
@@ -104,7 +106,7 @@ export class HydraMainService implements OnModuleInit {
     async onModuleInit() {
         console.log('onModuleInit');
         console.log('[LOAD ENVs]', this.CONSTANTS);
-        if (process.env.CONNECT_CARDANO === 'cardano-node') {
+        if (this.configService.get('CARDANO_CONNECTION_MODE') === 'cardano-node') {
             const listContainers = await this.docker.listContainers({ all: true });
 
             const cardanoNodeContainer = listContainers.find(
@@ -235,7 +237,7 @@ export class HydraMainService implements OnModuleInit {
     }
 
     async testOgmiosConnection() {
-        if (process.env.CONNECT_CARDANO !== 'cardano-node') {
+        if (this.configService.get('CARDANO_CONNECTION_MODE') !== 'cardano-node') {
             return 'Connected via Blockfrost API';
         }
         return this.ogmiosClientService.test();
@@ -252,7 +254,7 @@ export class HydraMainService implements OnModuleInit {
     }
 
     async getCardanoNodeInfo() {
-        if (process.env.CONNECT_CARDANO !== 'cardano-node') {
+        if (this.configService.get('CARDANO_CONNECTION_MODE') !== 'cardano-node') {
             return 'Connected via Blockfrost API';
         }
         const tip = await this.ogmiosClientService.queryTip();
