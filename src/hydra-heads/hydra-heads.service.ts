@@ -13,7 +13,7 @@ import { chmodSync, writeFileSync } from 'node:fs';
 import { resolveHydraNodeName } from 'src/hydra-main/utils/name-resolver';
 import { generateKeyFile } from 'src/utils/generator.util';
 import { ActiveHydraHeadsDto } from './dto/active-hydra-heads.dto';
-import { CardanoCliJs } from 'cardano-cli-js';
+import { CardanoCliJs } from 'cardanocli-js';
 import Docker from 'dockerode';
 import { DockerService } from 'src/docker/docker.service';
 import { convertUtxoToUTxOObject } from 'src/hydra-main/utils/ogmios-converter';
