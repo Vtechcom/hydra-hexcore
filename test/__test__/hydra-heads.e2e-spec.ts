@@ -97,7 +97,9 @@ describe('Hydra Head Service(e2e)', () => {
         // Setup global spies
         const checkUtxoSpy = jest.spyOn(hydraHeadService, 'checkUtxoAccount').mockResolvedValue(true);
         const writeFileSpy = jest.spyOn(hydraHeadService, 'writeFile').mockResolvedValue(undefined);
-        const convertSpy = jest.spyOn(hydraHeadService, 'convertBlockfrostToCardanoCliFormat').mockReturnValue(undefined);
+        const convertSpy = jest
+            .spyOn(hydraHeadService, 'convertBlockfrostToCardanoCliFormat')
+            .mockReturnValue(undefined);
         const updateRedisSpy = jest.spyOn(hydraHeadService, 'updateRedisActiveNodes').mockResolvedValue(undefined);
         const getCacheSpy = jest.spyOn(cacheManager, 'get').mockResolvedValue([]);
         const setCacheSpy = jest.spyOn(cacheManager, 'set').mockResolvedValue(undefined);
@@ -658,7 +660,8 @@ describe('Hydra Head Service(e2e)', () => {
                             fundSkey: 'delete_fund_skey',
                         },
                     ],
-                }).expect(201);
+                })
+                .expect(201);
             headToDeleteId = createResponse.body.id;
         });
 
@@ -701,7 +704,8 @@ describe('Hydra Head Service(e2e)', () => {
             const response = await request(app.getHttpServer())
                 .delete('/hydra-heads/delete/invalid')
                 .query({ id: 'invalid' })
-                .auth(accessToken, { type: 'bearer' }).expect(400);
+                .auth(accessToken, { type: 'bearer' })
+                .expect(400);
 
             expect(response.body).toHaveProperty('message');
             expect(response.body.message).toContain('Validation failed (numeric string is expected)');
