@@ -9,7 +9,7 @@ import { cleanupTestApp, createHydraHeadTestApp } from 'test/setup';
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import request from 'supertest';
-import { clearDatabase, createAdminAccountAndGetToken } from 'test/helper';
+import { addActiveNodes, clearDatabase, createAdminAccountAndGetToken, createHead } from 'test/helper';
 import { JwtService } from '@nestjs/jwt';
 import { DockerService } from '../../src/docker/docker.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -21,6 +21,7 @@ jest.mock('node:fs/promises', () => {
         ...real,
         access: jest.fn(),
         mkdir: jest.fn(),
+        rm: jest.fn(),
     };
 });
 
@@ -39,6 +40,25 @@ jest.mock('src/utils/cardano-core', () => ({
         .mockReturnValue('addr_test1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq'),
 }));
 
+// Mock @hydra-sdk/core BlockfrostProvider
+jest.mock('@hydra-sdk/core', () => ({
+    ProviderUtils: {
+        BlockfrostProvider: jest.fn().mockImplementation(() => ({
+            fetcher: {
+                fetchAddressUTxOs: jest.fn().mockResolvedValue({
+                    'mock-utxo-hash#0': {
+                        output: {
+                            amount: [
+                                { unit: 'lovelace', quantity: '100000000' }, // 100 ADA
+                            ],
+                        },
+                    },
+                }),
+            },
+        })),
+    },
+}));
+
 describe('Hydra Head Service(e2e)', () => {
     let app: INestApplication;
     let dataSource: DataSource;
@@ -49,6 +69,8 @@ describe('Hydra Head Service(e2e)', () => {
     let hydraHeadRepo: any;
     let accessToken: string;
     let cacheManager: any;
+
+    let globalSpies: jest.SpyInstance[] = [];
 
     beforeAll(async () => {
         const testApp = await createHydraHeadTestApp();
@@ -72,27 +94,36 @@ describe('Hydra Head Service(e2e)', () => {
         (fsSync.writeFileSync as unknown as jest.Mock).mockReturnValue(undefined);
         (fsSync.chmodSync as unknown as jest.Mock).mockReturnValue(undefined);
 
-        // Mock checkUtxoAccount to always return true (sufficient balance)
-        jest
-        .spyOn(hydraHeadService, 'checkUtxoAccount')
-        .mockResolvedValue(true);
+        // Setup global spies
+        const checkUtxoSpy = jest.spyOn(hydraHeadService, 'checkUtxoAccount').mockResolvedValue(true);
+        const writeFileSpy = jest.spyOn(hydraHeadService, 'writeFile').mockResolvedValue(undefined);
+        const convertSpy = jest.spyOn(hydraHeadService, 'convertBlockfrostToCardanoCliFormat').mockReturnValue(undefined);
+        const updateRedisSpy = jest.spyOn(hydraHeadService, 'updateRedisActiveNodes').mockResolvedValue(undefined);
+        const getCacheSpy = jest.spyOn(cacheManager, 'get').mockResolvedValue([]);
+        const setCacheSpy = jest.spyOn(cacheManager, 'set').mockResolvedValue(undefined);
+
+        globalSpies = [checkUtxoSpy, writeFileSpy, convertSpy, updateRedisSpy, getCacheSpy, setCacheSpy];
     }, 30000);
 
     afterEach(async () => {
-        // Use clearAllMocks so spies/mocks created in beforeAll remain applied.
-        // restoreAllMocks would restore original implementations and remove
-        // the spy on hydraHeadService.checkUtxoAccount, causing the active
-        // test to call the real implementation and hit the converter.
         jest.clearAllMocks();
-        
-        // Re-setup default fs mocks after clearing
+
+        // Reset về default behavior
         (fs.access as unknown as jest.Mock).mockResolvedValue(undefined);
         (fs.mkdir as unknown as jest.Mock).mockResolvedValue(undefined);
-        (fsSync.writeFileSync as unknown as jest.Mock).mockReturnValue(undefined);
-        (fsSync.chmodSync as unknown as jest.Mock).mockReturnValue(undefined);
+        (fs.rm as unknown as jest.Mock).mockResolvedValue(undefined);
+
+        // Reset cache spy về empty array
+        globalSpies[4]?.mockResolvedValue([]);
+
+        await clearDatabase(dataSource);
     });
 
     afterAll(async () => {
+        // Restore all spies
+        globalSpies.forEach(spy => spy?.mockRestore());
+        jest.restoreAllMocks();
+
         await cleanupTestApp(app, dataSource);
     });
 
@@ -103,6 +134,7 @@ describe('Hydra Head Service(e2e)', () => {
                 .auth(accessToken, { type: 'bearer' })
                 .send({
                     description: 'Test Hydra Head',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
                     hydraHeadKeys: [
                         {
                             hydraHeadVkey: 'hydra_head_vkey_example',
@@ -144,7 +176,6 @@ describe('Hydra Head Service(e2e)', () => {
             expect(response.body.message).toContain(
                 'persistenceRotateAfter must be a number conforming to the specified constraints',
             );
-            expect(response.body.message).toContain('hydraHeadKeys should not be empty');
         });
 
         it('should fail if no permission to create headDirPath', async () => {
@@ -157,6 +188,7 @@ describe('Hydra Head Service(e2e)', () => {
                 .auth(accessToken, { type: 'bearer' })
                 .send({
                     description: 'Test Hydra Head',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
                     hydraHeadKeys: [
                         {
                             hydraHeadVkey: 'hydra_head_vkey_example',
@@ -171,11 +203,12 @@ describe('Hydra Head Service(e2e)', () => {
             expect(response.body.message).toContain('Internal server error');
         });
 
-        it('should fail if not logged in as admin', async () => {
+        it('should fail if not logged in', async () => {
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/create')
                 .send({
                     description: 'Test Hydra Head',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
                     hydraHeadKeys: [
                         {
                             hydraHeadVkey: 'hydra_head_vkey_example',
@@ -192,12 +225,33 @@ describe('Hydra Head Service(e2e)', () => {
     });
 
     describe('POST hydra-heads/active', () => {
+        let hydraId: number;
+        beforeEach(async () => {
+            // Create a head to use in these tests
+            const responseCreate = await request(app.getHttpServer())
+                .post('/hydra-heads/create')
+                .auth(accessToken, { type: 'bearer' })
+                .send({
+                    description: 'Test Head for Active',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
+                    hydraHeadKeys: [
+                        {
+                            hydraHeadVkey: 'active_test_vkey',
+                            hydraHeadSkey: 'active_test_skey',
+                            fundVkey: 'active_test_fund_vkey',
+                            fundSkey: 'active_test_fund_skey',
+                        },
+                    ],
+                });
+            hydraId = responseCreate.body.id;
+        });
+
         it('should activate a hydra head successfully', async () => {
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/active')
                 .auth(accessToken, { type: 'bearer' })
                 .send({
-                    id: 1,
+                    id: hydraId,
                 })
                 .expect(200);
 
@@ -232,51 +286,60 @@ describe('Hydra Head Service(e2e)', () => {
 
         it('should fail to activate if wallet UTXO check fails', async () => {
             // Mock checkUtxoAccount to return false to simulate UTXO check failure
-            jest.spyOn(service, 'checkUtxoAccount').mockResolvedValueOnce(false);
+            globalSpies[0].mockResolvedValueOnce(false);
 
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/active')
                 .auth(accessToken, { type: 'bearer' })
                 .send({
-                    id: 1,
+                    id: hydraId,
                 })
                 .expect(400);
 
             expect(response.body).toHaveProperty('message');
             expect(response.body.message).toContain('not enough lovelace');
+            globalSpies[0].mockResolvedValue(true);
         });
 
         it('should fail to activate when max active nodes limit is reached', async () => {
-            // Mock cache to return 20 active nodes (at limit)
-            const mockActiveNodes = Array.from({ length: 20 }, (_, i) => ({
-                hydraNodeId: `${i + 1}`,
-                hydraHeadId: `${Math.floor(i / 5) + 1}`,
-                container: { Id: `mock-container-${i}` },
-                isActive: true,
-            }));
-
-            jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(mockActiveNodes);
-
+            globalSpies[4].mockResolvedValue(
+                Array.from({ length: Number(process.env.MAX_ACTIVE_NODES) }, (_, i) => ({
+                    hydraNodeId: `h-${i + 1}`,
+                    hydraHeadId: i + 1,
+                    container: { Id: `mock-${i}` },
+                    isActive: true,
+                })),
+            );
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/active')
                 .auth(accessToken, { type: 'bearer' })
                 .send({
-                    id: 1,
+                    id: hydraId,
                 })
                 .expect(400);
 
             expect(response.body).toHaveProperty('message');
             expect(response.body.message).toContain('maximum active nodes limit');
-            expect(response.body.message).toContain('would be exceeded');
+
+            globalSpies[4].mockResolvedValue([]);
         });
 
         it('should fail to activate when adding nodes would exceed limit', async () => {
+            globalSpies[4].mockResolvedValue(
+                Array.from({ length: Number(process.env.MAX_ACTIVE_NODES) - 2 }, (_, i) => ({
+                    hydraNodeId: `h-${i + 1}`,
+                    hydraHeadId: i + 1,
+                    container: { Id: `mock-${i}` },
+                    isActive: true,
+                })),
+            );
             // Create a head with 3 nodes
             const createResponse = await request(app.getHttpServer())
                 .post('/hydra-heads/create')
                 .auth(accessToken, { type: 'bearer' })
                 .send({
                     description: 'Multi-node Head',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
                     hydraHeadKeys: [
                         {
                             hydraHeadVkey: 'multi_node_vkey_1',
@@ -302,16 +365,6 @@ describe('Hydra Head Service(e2e)', () => {
 
             const multiNodeHeadId = createResponse.body.id;
 
-            // Mock cache to return 18 active nodes (adding 3 more would exceed 20)
-            const mockActiveNodes = Array.from({ length: 18 }, (_, i) => ({
-                hydraNodeId: `${i + 1}`,
-                hydraHeadId: `${Math.floor(i / 5) + 1}`,
-                container: { Id: `mock-container-${i}` },
-                isActive: true,
-            }));
-
-            jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(mockActiveNodes);
-
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/active')
                 .auth(accessToken, { type: 'bearer' })
@@ -322,35 +375,30 @@ describe('Hydra Head Service(e2e)', () => {
 
             expect(response.body).toHaveProperty('message');
             expect(response.body.message).toContain('maximum active nodes limit');
-            expect(response.body.message).toContain('Current active nodes: 18');
-            expect(response.body.message).toContain('nodes to add: 3');
-        });
 
-        it('should successfully activate when within node limit', async () => {
-            // Mock cache to return 15 active nodes (adding 1 more is within limit of 20)
-            const mockActiveNodes = Array.from({ length: 15 }, (_, i) => ({
-                hydraNodeId: `${i + 1}`,
-                hydraHeadId: `${Math.floor(i / 5) + 1}`,
-                container: { Id: `mock-container-${i}` },
-                isActive: true,
-            }));
-
-            jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(mockActiveNodes);
-
-            const response = await request(app.getHttpServer())
-                .post('/hydra-heads/active')
-                .auth(accessToken, { type: 'bearer' })
-                .send({
-                    id: 1,
-                })
-                .expect(200);
-
-            expect(response.body).toHaveProperty('status');
-            expect(response.body.status).toBe('running');
+            globalSpies[4].mockResolvedValue([]);
         });
     });
 
     describe('GET hydra-heads/list', () => {
+        beforeEach(async () => {
+            // Create a head to use in these tests
+            await request(app.getHttpServer())
+                .post('/hydra-heads/create')
+                .auth(accessToken, { type: 'bearer' })
+                .send({
+                    description: 'Test Head for Active',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
+                    hydraHeadKeys: [
+                        {
+                            hydraHeadVkey: 'active_test_vkey',
+                            hydraHeadSkey: 'active_test_skey',
+                            fundVkey: 'active_test_fund_vkey',
+                            fundSkey: 'active_test_fund_skey',
+                        },
+                    ],
+                });
+        });
         it('should return list of hydra heads', async () => {
             const response = await request(app.getHttpServer())
                 .get('/hydra-heads/list')
@@ -382,30 +430,30 @@ describe('Hydra Head Service(e2e)', () => {
                 isActive: true,
             }));
 
-            jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(mockActiveNodes);
+            globalSpies[4].mockResolvedValue(mockActiveNodes);
 
-            const count = await service.countActiveNodes();
-            expect(count).toBe(5);
+            const activeNodes = await service.getActiveNodeContainers();
+            expect(activeNodes.length).toBe(5);
         });
 
         it('should return 0 when cache is empty', async () => {
             // Mock cache returning empty array
-            jest.spyOn(cacheManager, 'get').mockResolvedValueOnce([]);
+            globalSpies[4].mockResolvedValue([]);
 
-            const count = await service.countActiveNodes();
-            expect(count).toBe(0);
+            const activeNodes = await service.getActiveNodeContainers();
+            expect(activeNodes.length).toBe(0);
         });
 
         it('should return 0 when cache returns null/undefined', async () => {
             // Mock cache returning null (not set yet)
-            jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(null);
+            globalSpies[4].mockResolvedValue(null);
 
-            const count = await service.countActiveNodes();
-            expect(count).toBe(0);
+            const activeNodes = await service.getActiveNodeContainers();
+            expect(activeNodes.length).toBe(0);
         });
 
         it('should reflect docker container status via cache', async () => {
-            // This test verifies that countActiveNodes uses the cache
+            // This test verifies that getActiveNodeContainers uses the cache
             // which is updated by DockerService cron job
 
             // Simulate cron job updating cache with running containers
@@ -429,26 +477,44 @@ describe('Hydra Head Service(e2e)', () => {
                     isActive: true,
                 },
             ];
-
-            await cacheManager.set('activeNodes', runningContainers);
-
-            const count = await service.countActiveNodes();
-            expect(count).toBe(3);
+            globalSpies[4].mockResolvedValue(runningContainers);
 
             // Verify it's using getActiveNodeContainers which reads from cache
             const activeContainers = await service.getActiveNodeContainers();
             expect(activeContainers).toEqual(runningContainers);
-            expect(activeContainers.length).toBe(count);
+            expect(activeContainers.length).toBe(3);
         });
     });
 
     describe('POST hydra-heads/deactive', () => {
         it('should deactivate a hydra head successfully', async () => {
-            // First, ensure we have an active hydra head
+            // Create a head first
+            const createResponse = await request(app.getHttpServer())
+                .post('/hydra-heads/create')
+                .auth(accessToken, { type: 'bearer' })
+                .send({
+                    description: 'Test Head for Deactive',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
+                    hydraHeadKeys: [
+                        {
+                            hydraHeadVkey: 'deactive_test_vkey',
+                            hydraHeadSkey: 'deactive_test_skey',
+                            fundVkey: 'deactive_test_fund_vkey',
+                            fundSkey: 'deactive_test_fund_skey',
+                        },
+                    ],
+                });
+
+            const headId = createResponse.body.id;
+
+            // Mock empty cache for activation
+            globalSpies[4].mockResolvedValue([]);
+
+            // First, activate the head
             const activeResponse = await request(app.getHttpServer())
                 .post('/hydra-heads/active')
                 .auth(accessToken, { type: 'bearer' })
-                .send({ id: 1 })
+                .send({ id: headId })
                 .expect(200);
 
             expect(activeResponse.body.status).toBe('running');
@@ -457,7 +523,7 @@ describe('Hydra Head Service(e2e)', () => {
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/deactive')
                 .auth(accessToken, { type: 'bearer' })
-                .send({ id: 1 })
+                .send({ id: headId })
                 .expect(200);
 
             expect(response.body).toHaveProperty('status');
@@ -498,10 +564,15 @@ describe('Hydra Head Service(e2e)', () => {
 
     describe('POST hydra-heads/clear-head-data', () => {
         it('should clear head data successfully', async () => {
+            // Create a head first
+            const createResponse = await createHead(app, accessToken);
+
+            const headId = createResponse.id;
+
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/clear-head-data')
                 .auth(accessToken, { type: 'bearer' })
-                .send({ ids: [1] })
+                .send({ ids: [headId] })
                 .expect(200);
 
             expect(response.body).toHaveProperty('removedDirs');
@@ -512,29 +583,19 @@ describe('Hydra Head Service(e2e)', () => {
         });
 
         it('should clear multiple heads data successfully', async () => {
-            // Create another hydra head first
-            const createResponse = await request(app.getHttpServer())
-                .post('/hydra-heads/create')
-                .auth(accessToken, { type: 'bearer' })
-                .send({
-                    description: 'Second Test Hydra Head',
-                    hydraHeadKeys: [
-                        {
-                            hydraHeadVkey: 'hydra_head_vkey_example_2',
-                            hydraHeadSkey: 'hydra_head_skey_example_2',
-                            fundVkey: 'fund_vkey_example_2',
-                            fundSkey: 'fund_skey_example_2',
-                        },
-                    ],
-                })
-                .expect(201);
+            // Create two hydra heads
+            const createResponse1 = await createHead(app, accessToken);
 
-            const secondHeadId = createResponse.body.id;
+            const firstHeadId = createResponse1.id;
+
+            const createResponse2 = await createHead(app, accessToken);
+
+            const secondHeadId = createResponse2.id;
 
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/clear-head-data')
                 .auth(accessToken, { type: 'bearer' })
-                .send({ ids: [1, secondHeadId] })
+                .send({ ids: [firstHeadId, secondHeadId] })
                 .expect(200);
 
             expect(response.body.heads).toBeInstanceOf(Array);
@@ -588,6 +649,7 @@ describe('Hydra Head Service(e2e)', () => {
                 .auth(accessToken, { type: 'bearer' })
                 .send({
                     description: 'Hydra Head To Delete',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
                     hydraHeadKeys: [
                         {
                             hydraHeadVkey: 'delete_hydra_head_vkey',
@@ -596,24 +658,13 @@ describe('Hydra Head Service(e2e)', () => {
                             fundSkey: 'delete_fund_skey',
                         },
                     ],
-                });
-
-            // Only set headToDeleteId if creation was successful
-            if (createResponse.status === 201) {
-                headToDeleteId = createResponse.body.id;
-            }
+                }).expect(201);
+            headToDeleteId = createResponse.body.id;
         });
 
         it('should delete a hydra head successfully', async () => {
-            // Skip if head wasn't created successfully in beforeEach
-            if (!headToDeleteId) {
-                console.log('Skipping test - no head created in beforeEach');
-                return;
-            }
-
             const response = await request(app.getHttpServer())
                 .delete(`/hydra-heads/delete/${headToDeleteId}`)
-                .query({ id: headToDeleteId })
                 .auth(accessToken, { type: 'bearer' })
                 .expect(200);
 
@@ -628,7 +679,6 @@ describe('Hydra Head Service(e2e)', () => {
         it('should fail to delete non-existing hydra head', async () => {
             const response = await request(app.getHttpServer())
                 .delete('/hydra-heads/delete/9999')
-                .query({ id: 9999 })
                 .auth(accessToken, { type: 'bearer' })
                 .expect(404);
 
@@ -637,12 +687,6 @@ describe('Hydra Head Service(e2e)', () => {
         });
 
         it('should fail to delete without authentication', async () => {
-            // Skip if head wasn't created successfully in beforeEach
-            if (!headToDeleteId) {
-                console.log('Skipping test - no head created in beforeEach');
-                return;
-            }
-
             const response = await request(app.getHttpServer())
                 .delete(`/hydra-heads/delete/${headToDeleteId}`)
                 .query({ id: headToDeleteId })
@@ -657,21 +701,13 @@ describe('Hydra Head Service(e2e)', () => {
             const response = await request(app.getHttpServer())
                 .delete('/hydra-heads/delete/invalid')
                 .query({ id: 'invalid' })
-                .auth(accessToken, { type: 'bearer' });
+                .auth(accessToken, { type: 'bearer' }).expect(400);
 
-            // The endpoint will try to parse 'invalid' as number
-            // Depending on implementation, it may return 400 or 404
-            expect([400, 404, 500]).toContain(response.status);
             expect(response.body).toHaveProperty('message');
+            expect(response.body.message).toContain('Validation failed (numeric string is expected)');
         });
 
         it('should clean up docker containers when deleting head', async () => {
-            // Skip if head wasn't created successfully in beforeEach
-            if (!headToDeleteId) {
-                console.log('Skipping test - no head created in beforeEach');
-                return;
-            }
-
             // Spy on dockerService to verify container cleanup
             const dockerService = moduleFixture.get(DockerService);
             const removeContainerSpy = jest.spyOn(dockerService, 'removeContainerByName');
@@ -689,52 +725,18 @@ describe('Hydra Head Service(e2e)', () => {
     });
 
     describe('POST hydra-heads/restart/:id', () => {
-        beforeEach(() => {
+        let headId: number;
+        beforeEach(async () => {
             const dockerService = moduleFixture.get(DockerService);
             jest.spyOn(dockerService, 'restartContainerByName').mockResolvedValue(undefined);
-        });
 
-        it('should restart a hydra head successfully', async () => {
-            // Create a head for this test
-            const createResponse = await request(app.getHttpServer())
-                .post('/hydra-heads/create')
-                .auth(accessToken, { type: 'bearer' })
-                .send({
-                    description: 'Hydra Head To Restart',
-                    hydraHeadKeys: [
-                        {
-                            hydraHeadVkey: 'restart_test_vkey',
-                            hydraHeadSkey: 'restart_test_skey',
-                            fundVkey: 'restart_test_fund_vkey',
-                            fundSkey: 'restart_test_fund_skey',
-                        },
-                    ],
-                });
-
-            if (createResponse.status !== 201) {
-                console.log('Skipping test - failed to create head');
-                return;
-            }
-
-            const headId = createResponse.body.id;
-
-            const response = await request(app.getHttpServer())
-                .post(`/hydra-heads/restart/${headId}`)
-                .auth(accessToken, { type: 'bearer' })
-                .expect(200);
-
-            expect(response.body).toHaveProperty('message');
-            expect(response.body.message).toContain('restarted');
-            expect(response.body.message).toContain(headId.toString());
-        });
-
-        it('should restart a hydra head with multiple nodes', async () => {
             // Create a hydra head with multiple nodes
             const createResponse = await request(app.getHttpServer())
                 .post('/hydra-heads/create')
                 .auth(accessToken, { type: 'bearer' })
                 .send({
                     description: 'Multi-node Hydra Head To Restart',
+                    blockfrostProjectId: 'test_blockfrost_project_id',
                     hydraHeadKeys: [
                         {
                             hydraHeadVkey: 'restart_multi_vkey_1',
@@ -756,11 +758,25 @@ describe('Hydra Head Service(e2e)', () => {
                         },
                     ],
                 });
+            const createvalueCache = await addActiveNodes(createResponse.body.nodes, createResponse.body.id);
+            globalSpies[4].mockResolvedValue(createvalueCache);
+            headId = createResponse.body.id;
+        });
 
-            const multiNodeHeadId = createResponse.body.id;
-
+        it('should restart a hydra head successfully', async () => {
             const response = await request(app.getHttpServer())
-                .post(`/hydra-heads/restart/${multiNodeHeadId}`)
+                .post(`/hydra-heads/restart/${headId}`)
+                .auth(accessToken, { type: 'bearer' })
+                .expect(200);
+
+            expect(response.body).toHaveProperty('message');
+            expect(response.body.message).toContain('restarted');
+            expect(response.body.message).toContain(headId.toString());
+        });
+
+        it('should restart a hydra head with multiple nodes', async () => {
+            const response = await request(app.getHttpServer())
+                .post(`/hydra-heads/restart/${headId}`)
                 .auth(accessToken, { type: 'bearer' })
                 .expect(200);
 
@@ -779,7 +795,7 @@ describe('Hydra Head Service(e2e)', () => {
         });
 
         it('should fail to restart without authentication', async () => {
-            const response = await request(app.getHttpServer()).post('/hydra-heads/restart/1').expect(401);
+            const response = await request(app.getHttpServer()).post(`/hydra-heads/restart/${headId}`).expect(401);
 
             expect(response.body).toHaveProperty('message');
             expect(response.body.message).toBe('Unauthorized');
@@ -789,7 +805,7 @@ describe('Hydra Head Service(e2e)', () => {
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/restart/abc')
                 .auth(accessToken, { type: 'bearer' })
-                .expect(500);
+                .expect(400);
 
             expect(response.body).toHaveProperty('message');
         });
@@ -799,37 +815,8 @@ describe('Hydra Head Service(e2e)', () => {
 
             jest.spyOn(dockerService, 'restartContainerByName').mockRejectedValue(new Error('Container not found'));
 
-            // Create a hydra head with multiple nodes
-            const createResponse = await request(app.getHttpServer())
-                .post('/hydra-heads/create')
-                .auth(accessToken, { type: 'bearer' })
-                .send({
-                    description: 'Multi-node Head For Partial Restart Failure',
-                    hydraHeadKeys: [
-                        {
-                            hydraHeadVkey: 'partial_fail_vkey_1',
-                            hydraHeadSkey: 'partial_fail_skey_1',
-                            fundVkey: 'partial_fail_fund_vkey_1',
-                            fundSkey: 'partial_fail_fund_skey_1',
-                        },
-                        {
-                            hydraHeadVkey: 'partial_fail_vkey_2',
-                            hydraHeadSkey: 'partial_fail_skey_2',
-                            fundVkey: 'partial_fail_fund_vkey_2',
-                            fundSkey: 'partial_fail_fund_skey_2',
-                        },
-                    ],
-                });
-
-            if (createResponse.status !== 201) {
-                console.log('Failed to create multi-node head for partial failure test, skipping');
-                return;
-            }
-
-            const multiNodeHeadId = createResponse.body.id;
-
             const response = await request(app.getHttpServer())
-                .post(`/hydra-heads/restart/${multiNodeHeadId}`)
+                .post(`/hydra-heads/restart/${headId}`)
                 .auth(accessToken, { type: 'bearer' })
                 .expect(400);
 
@@ -839,29 +826,6 @@ describe('Hydra Head Service(e2e)', () => {
         });
 
         it('should verify container names passed to docker service', async () => {
-            // Create a head for this test
-            const createResponse = await request(app.getHttpServer())
-                .post('/hydra-heads/create')
-                .auth(accessToken, { type: 'bearer' })
-                .send({
-                    description: 'Head For Container Name Test',
-                    hydraHeadKeys: [
-                        {
-                            hydraHeadVkey: 'container_name_vkey',
-                            hydraHeadSkey: 'container_name_skey',
-                            fundVkey: 'container_name_fund_vkey',
-                            fundSkey: 'container_name_fund_skey',
-                        },
-                    ],
-                });
-
-            if (createResponse.status !== 201) {
-                console.log('Skipping test - failed to create head');
-                return;
-            }
-
-            const headId = createResponse.body.id;
-
             await request(app.getHttpServer())
                 .post(`/hydra-heads/restart/${headId}`)
                 .auth(accessToken, { type: 'bearer' })

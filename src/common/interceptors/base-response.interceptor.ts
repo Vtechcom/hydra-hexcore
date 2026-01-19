@@ -36,7 +36,7 @@ export class BaseResponseInterceptor<T> implements NestInterceptor<T, any> {
                 const problem: any = {
                     type: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
                     title: 'An error occurred',
-                    status: res.statusCode >=200 && res.statusCode <300 ? 500 : res.statusCode,
+                    status: res.statusCode >= 200 && res.statusCode < 300 ? 500 : res.statusCode,
                     detail: err.message || 'Internal Server Error',
                     instance: req.url,
                 };

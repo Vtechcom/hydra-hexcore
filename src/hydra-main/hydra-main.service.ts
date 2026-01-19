@@ -547,7 +547,6 @@ export class HydraMainService implements OnModuleInit {
                 CheckDuplicate: true,
             });
             console.log(`Network ${networkName} created successfully`);
-            
         } catch (error: any) {
             console.error(`Error ensuring network ${networkName}:`, error.message);
             throw new Error(`Failed to ensure network ${networkName}: ${error.message}`);
@@ -567,13 +566,12 @@ export class HydraMainService implements OnModuleInit {
                 console.log('Connecting cardano-node to hydra-network');
                 const hydraNetwork = this.docker.getNetwork('hydra-network');
                 await hydraNetwork.connect({
-                    Container: containerId
+                    Container: containerId,
                 });
                 console.log('Cardano-node successfully connected to hydra-network');
             } else {
                 console.log('Cardano-node is already connected to hydra-network');
             }
-            
         } catch (error: any) {
             console.error(`Error ensuring cardano-node network connection:`, error.message);
             // Don't throw here as this is not critical for startup
@@ -596,7 +594,9 @@ export class HydraMainService implements OnModuleInit {
             const isInitiallyConnected = await this.checkContainerNetworkConnection(containerId, networkName);
 
             if (!isInitiallyConnected) {
-                console.log(`Container ${containerId} not properly connected to ${networkName}, attempting to reconnect...`);
+                console.log(
+                    `Container ${containerId} not properly connected to ${networkName}, attempting to reconnect...`,
+                );
 
                 const network = this.docker.getNetwork(networkName);
 
@@ -609,14 +609,16 @@ export class HydraMainService implements OnModuleInit {
 
                 // Reconnect to network
                 await network.connect({
-                    Container: containerId
+                    Container: containerId,
                 });
 
                 console.log(`Container ${containerId} successfully reconnected to ${networkName}`);
             } else {
                 const containerInfo = await this.docker.getContainer(containerId).inspect();
                 const networkSettings = containerInfo.NetworkSettings.Networks[networkName];
-                console.log(`Container ${containerId} is properly connected to ${networkName} with IP: ${networkSettings.IPAddress}`);
+                console.log(
+                    `Container ${containerId} is properly connected to ${networkName} with IP: ${networkSettings.IPAddress}`,
+                );
             }
         } catch (error: any) {
             console.error(`Error ensuring container network connection:`, error.message);
@@ -728,7 +730,9 @@ export class HydraMainService implements OnModuleInit {
         }
 
         // All attempts failed
-        throw new Error(`Failed to start/create container ${nodeName} after ${retryCount + 1} attempts: ${lastError?.message}`);
+        throw new Error(
+            `Failed to start/create container ${nodeName} after ${retryCount + 1} attempts: ${lastError?.message}`,
+        );
     }
 
     /**

@@ -20,17 +20,17 @@ export class AdminAuthGuard implements CanActivate {
             const payload = await this.jwtService.verifyAsync<AdminJwtPayload>(token, {
                 secret: jwtConstants.secret,
             });
-            
+
             // Verify payload structure and role
             if (!payload.username || !payload.id || !payload.role) {
                 throw new UnauthorizedException('Invalid token payload structure');
             }
-            
+
             // Verify role is Admin
             if (payload.role !== Role.Admin) {
                 throw new UnauthorizedException('Insufficient permissions: Admin role required');
             }
-            
+
             request['user'] = payload;
         } catch (error) {
             throw new UnauthorizedException();

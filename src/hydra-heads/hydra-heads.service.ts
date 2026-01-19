@@ -238,7 +238,6 @@ export class HydraHeadService {
 
         // Get protocol parameters from Blockfrost API
         const blockfrostParams = await this.blockfrostApiService.getProtocolParameters();
-        this.logger.error(`Fetched protocol parameters from Blockfrost: ${JSON.stringify(blockfrostParams)}`);
         const protocolParameters = this.convertBlockfrostToCardanoCliFormat(blockfrostParams);
         await this.writeFile(
             `${headDirPath}/protocol-parameters.json`,
@@ -365,7 +364,7 @@ export class HydraHeadService {
             await this.hydraHeadRepository.save(head);
 
             // Update Redis cache - add newly activated nodes
-            await this.updateRedisActiveNodes(head, createdContainers);
+            // await this.updateRedisActiveNodes(head, createdContainers);
         } catch (error: any) {
             // If any container fails, cleanup all created containers
             this.logger.error(`Error activating head ${head.id}: ${error.message}`);
@@ -397,7 +396,7 @@ export class HydraHeadService {
         };
     }
 
-    private convertBlockfrostToCardanoCliFormat(blockfrostParams: any) {
+    public convertBlockfrostToCardanoCliFormat(blockfrostParams: any) {
         const hydraParams = {
             collateralPercentage: blockfrostParams.collateral_percent,
             committeeMaxTermLength: parseInt(blockfrostParams.committee_max_term_length),
@@ -742,7 +741,7 @@ export class HydraHeadService {
      * Update Redis cache by adding newly activated nodes
      * Similar to updateHydraContainerStatus but only adds new nodes
      */
-    private async updateRedisActiveNodes(head: HydraHead, containers: Docker.Container[]): Promise<void> {
+    public async updateRedisActiveNodes(head: HydraHead, containers: Docker.Container[]): Promise<void> {
         try {
             // Get current active nodes from Redis
             const currentActiveNodes = (await this.cacheManager.get<Caching['activeNodes']>('activeNodes')) || [];

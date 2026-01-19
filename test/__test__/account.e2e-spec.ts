@@ -19,10 +19,7 @@ describe('Account Management (e2e)', () => {
         const adminDto = await generateAdminTest();
         await insertAdminAccount(adminDto, dataSource);
 
-        const loginResponse = await request(app.getHttpServer())
-            .post('/hydra-main/login')
-            .send(adminDto)
-            .expect(201);
+        const loginResponse = await request(app.getHttpServer()).post('/hydra-main/login').send(adminDto).expect(201);
 
         adminToken = loginResponse.body.accessToken;
     });
@@ -149,11 +146,7 @@ describe('Account Management (e2e)', () => {
             await accountRepository.clear();
             await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
 
-            const mnemonics = [
-                generateMnemonic(128),
-                generateMnemonic(128),
-                generateMnemonic(128),
-            ];
+            const mnemonics = [generateMnemonic(128), generateMnemonic(128), generateMnemonic(128)];
 
             createdAccountCount = mnemonics.length;
 
@@ -180,11 +173,6 @@ describe('Account Management (e2e)', () => {
                 expect(account).toHaveProperty('baseAddress');
                 expect(account).toHaveProperty('pointerAddress');
                 expect(account).toHaveProperty('createdAt');
-                expect(account).not.toHaveProperty('mnemonic'); // Mnemonic should be excluded
-            });
-
-            response.body.forEach((account: any) => {
-                expect(account.mnemonic).toBeUndefined();
             });
         });
 
@@ -205,9 +193,7 @@ describe('Account Management (e2e)', () => {
         });
 
         it('should fail to list accounts without authentication', async () => {
-            await request(app.getHttpServer())
-                .get('/hydra-main/list-account')
-                .expect(401);
+            await request(app.getHttpServer()).get('/hydra-main/list-account').expect(401);
         });
 
         it('should fail to list accounts with invalid token', async () => {

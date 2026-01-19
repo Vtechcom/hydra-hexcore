@@ -3,27 +3,27 @@ import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
 export class Account {
-  @PrimaryGeneratedColumn()
-  id: number;
+    @PrimaryGeneratedColumn()
+    id: number;
 
-  @Column({
-    unique: true,
-  })
-  baseAddress: string;
+    @Column({
+        unique: true,
+    })
+    baseAddress: string;
 
-  @Column({
-    unique: true,
-  })
-  pointerAddress: string;
+    @Column({
+        unique: true,
+    })
+    pointerAddress: string;
 
-  @Exclude()
-  @Column({
-    unique: true,
-  })
-  mnemonic: string;
+    @Exclude()
+    @Column({
+        unique: true,
+    })
+    mnemonic: string;
 
-  @Column({
-    default: new Date().toISOString(),
-  })
-  createdAt: string;
+    @Column({
+        default: new Date().toISOString(),
+    })
+    createdAt: string;
 }

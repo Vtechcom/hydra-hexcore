@@ -1,5 +1,8 @@
-import { JwtService } from "@nestjs/jwt";
-import { DataSource } from "typeorm";
+import { INestApplication } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { HydraHead } from 'src/hydra-heads/entities/HydraHead.entity';
+import request from 'supertest';
+import { DataSource } from 'typeorm';
 
 export const StatusConsumerType = {
     ACTIVE: 'ACTIVE',
@@ -10,13 +13,13 @@ export const StatusConsumerType = {
     REJECTED: 'REJECTED',
 } as const;
 
-export type StatusConsumer = typeof StatusConsumerType[keyof typeof StatusConsumerType];
+export type StatusConsumer = (typeof StatusConsumerType)[keyof typeof StatusConsumerType];
 
 export async function generateAdminTest() {
     return {
         username: 'admin_test',
         password: 'admin_password_test',
-    }
+    };
 }
 
 export async function insertAdminAccount(data: { username: string; password: string }, dataSource: DataSource) {
@@ -89,6 +92,33 @@ export async function createAdminAccountAndGetToken(dataSource: DataSource, jwtS
         await userRepository.save(admin);
     }
     const payload = { username: admin.username, id: admin.id, role: admin.role };
-    
+
     return await jwtService.signAsync(payload);
+}
+
+export async function addActiveNodes(nodes: any, headId: number) {
+    return nodes.map((node: any, index: number) => ({
+        hydraNodeId: node.id.toString(),
+        hydraHeadId: headId.toString(),
+        isActive: true,
+    }));
+}
+
+export async function createHead(app: INestApplication, accessToken: string): Promise<HydraHead> {
+    const response = await request(app.getHttpServer())
+        .post('/hydra-heads/create')
+        .auth(accessToken, { type: 'bearer' })
+        .send({
+            description: 'Test Head for Clear Data',
+            blockfrostProjectId: 'test_blockfrost_project_id',
+            hydraHeadKeys: [
+                {
+                    hydraHeadVkey: 'clear_data_test_vkey',
+                    hydraHeadSkey: 'clear_data_test_skey',
+                    fundVkey: 'clear_data_test_fund_vkey',
+                    fundSkey: 'clear_data_test_fund_skey',
+                },
+            ],
+        });
+    return response.body;
 }

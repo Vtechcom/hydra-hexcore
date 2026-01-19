@@ -3,37 +3,34 @@ import { mnemonicToEntropy } from 'bip39';
 import { CardanoCliWallet, EmbeddedWallet, KeysUtils } from '@hydra-sdk/core';
 
 export const NetworkInfo = {
-  MAINNET: CardanoWasm.NetworkInfo.mainnet().network_id(),
-  TESTNET_PREPROD: CardanoWasm.NetworkInfo.testnet_preprod().network_id(),
+    MAINNET: CardanoWasm.NetworkInfo.mainnet().network_id(),
+    TESTNET_PREPROD: CardanoWasm.NetworkInfo.testnet_preprod().network_id(),
 };
 
 // Purpose derivation (See BIP43)
 export enum Purpose {
-  CIP1852 = 1852, // see CIP 1852
+    CIP1852 = 1852, // see CIP 1852
 }
 
 // Cardano coin type (SLIP 44)
 export enum CoinTypes {
-  CARDANO = 1815,
+    CARDANO = 1815,
 }
 
 export enum ChainDerivation {
-  EXTERNAL = 0, // from BIP44
-  INTERNAL = 1, // from BIP44
-  CHIMERIC = 2, // from CIP1852
+    EXTERNAL = 0, // from BIP44
+    INTERNAL = 1, // from BIP44
+    CHIMERIC = 2, // from CIP1852
 }
 
 function harden(num: number): number {
-  return num | 0x80000000;
+    return num | 0x80000000;
 }
 
 export function getRootKeyByMnemonic(mnemonic: string): CardanoWasm.Bip32PrivateKey {
-  const entropy = mnemonicToEntropy(mnemonic);
-  const rootKey = CardanoWasm.Bip32PrivateKey.from_bip39_entropy(
-    Buffer.from(entropy, 'hex'),
-    Buffer.from(''),
-  );
-  return rootKey;
+    const entropy = mnemonicToEntropy(mnemonic);
+    const rootKey = CardanoWasm.Bip32PrivateKey.from_bip39_entropy(Buffer.from(entropy, 'hex'), Buffer.from(''));
+    return rootKey;
 }
 
 /**
@@ -42,31 +39,31 @@ export function getRootKeyByMnemonic(mnemonic: string): CardanoWasm.Bip32Private
  * @returns path `1852'/1815'/0'/0/0`
  */
 export function getBaseAddressFromMnemonic(mnemonic: string): CardanoWasm.BaseAddress {
-  const rootKey = getRootKeyByMnemonic(mnemonic);
-  // Derive the key using path 1852'/1815'/0'/0/0
-  const accountKey = rootKey
-    .derive(1852 | 0x80000000) // Purpose: 1852'
-    .derive(1815 | 0x80000000) // Coin type: 1815' (ADA)
-    .derive(0 | 0x80000000) // Account index: 0'
-    .derive(0) // External chain: 0
-    .derive(0); // Address index: 0
-  const publicKey = accountKey.to_public();
-  const network = CardanoWasm.NetworkInfo.testnet_preprod(); // Use NetworkInfo.testnet() for testnet
+    const rootKey = getRootKeyByMnemonic(mnemonic);
+    // Derive the key using path 1852'/1815'/0'/0/0
+    const accountKey = rootKey
+        .derive(1852 | 0x80000000) // Purpose: 1852'
+        .derive(1815 | 0x80000000) // Coin type: 1815' (ADA)
+        .derive(0 | 0x80000000) // Account index: 0'
+        .derive(0) // External chain: 0
+        .derive(0); // Address index: 0
+    const publicKey = accountKey.to_public();
+    const network = CardanoWasm.NetworkInfo.testnet_preprod(); // Use NetworkInfo.testnet() for testnet
 
-  // Deriving the staking private key using the path 1852'/1815'/0'/2/0
-  const stakingPrivateKey = rootKey
-    .derive(1852 | 0x80000000) // Purpose: 1852'
-    .derive(1815 | 0x80000000) // Coin type: 1815' (ADA)
-    .derive(0 | 0x80000000) // Account index: 0'
-    .derive(2) // Internal chain: 2 (for staking)
-    .derive(0); // Staking key index: 0
+    // Deriving the staking private key using the path 1852'/1815'/0'/2/0
+    const stakingPrivateKey = rootKey
+        .derive(1852 | 0x80000000) // Purpose: 1852'
+        .derive(1815 | 0x80000000) // Coin type: 1815' (ADA)
+        .derive(0 | 0x80000000) // Account index: 0'
+        .derive(2) // Internal chain: 2 (for staking)
+        .derive(0); // Staking key index: 0
 
-  const baseAddress = CardanoWasm.BaseAddress.new(
-    network.network_id(),
-    CardanoWasm.Credential.from_keyhash(publicKey.to_raw_key().hash()),
-    CardanoWasm.Credential.from_keyhash(stakingPrivateKey.to_public().to_raw_key().hash()),
-  );
-  return baseAddress;
+    const baseAddress = CardanoWasm.BaseAddress.new(
+        network.network_id(),
+        CardanoWasm.Credential.from_keyhash(publicKey.to_raw_key().hash()),
+        CardanoWasm.Credential.from_keyhash(stakingPrivateKey.to_public().to_raw_key().hash()),
+    );
+    return baseAddress;
 }
 
 /**
@@ -75,113 +72,110 @@ export function getBaseAddressFromMnemonic(mnemonic: string): CardanoWasm.BaseAd
  * @returns Acccount 1852' / 1815' / 0'
  */
 export function getCip1852Account(mnemonic: string): CardanoWasm.Bip32PrivateKey {
-  const rootKey = getRootKeyByMnemonic(mnemonic);
-  return rootKey
-    .derive(harden(Purpose.CIP1852))
-    .derive(harden(CoinTypes.CARDANO))
-    .derive(harden(0)); // account #0
+    const rootKey = getRootKeyByMnemonic(mnemonic);
+    return rootKey.derive(harden(Purpose.CIP1852)).derive(harden(CoinTypes.CARDANO)).derive(harden(0)); // account #0
 }
 
 export function getPrivateKeyByMnemonic(mnemonic: string): CardanoWasm.Bip32PrivateKey {
-  const account = getCip1852Account(mnemonic);
-  const prvKey = account.derive(ChainDerivation.EXTERNAL).derive(0);
-  return prvKey;
+    const account = getCip1852Account(mnemonic);
+    const prvKey = account.derive(ChainDerivation.EXTERNAL).derive(0);
+    return prvKey;
 }
 
 export class PaymentSigningKey {
-  public type: string;
-  public description: string;
-  public cborHex: string;
-  /**
-   * @param extendedKey : 64 bytes extended key
-   */
-  constructor(extendedKey: string) {
-    if (extendedKey.length !== 64) {
-      throw new Error('Invalid extended key');
+    public type: string;
+    public description: string;
+    public cborHex: string;
+    /**
+     * @param extendedKey : 64 bytes extended key
+     */
+    constructor(extendedKey: string) {
+        if (extendedKey.length !== 64) {
+            throw new Error('Invalid extended key');
+        }
+        this.type = 'PaymentSigningKeyShelley_ed25519';
+        this.description = 'Generated by Hexcore';
+        this.cborHex = `5820${extendedKey}`;
     }
-    this.type = 'PaymentSigningKeyShelley_ed25519';
-    this.description = 'Generated by Hexcore';
-    this.cborHex = `5820${extendedKey}`;
-  }
 
-  toJSON(replacer?: any, space?: string | number) {
-    return JSON.stringify(
-      {
-        type: this.type,
-        description: this.description,
-        cborHex: this.cborHex,
-      },
-      replacer,
-      space,
-    );
-  }
+    toJSON(replacer?: any, space?: string | number) {
+        return JSON.stringify(
+            {
+                type: this.type,
+                description: this.description,
+                cborHex: this.cborHex,
+            },
+            replacer,
+            space,
+        );
+    }
 }
 export function getSigningKeyFromMnemonic(mnemonic: string): PaymentSigningKey {
-  const rootKey = getRootKeyByMnemonic(mnemonic);
-  const paymentKey = rootKey // Derive the key using path 1852'/1815'/0'/0/0
-    .derive(Purpose.CIP1852 | 0x80000000)
-    .derive(CoinTypes.CARDANO | 0x80000000)
-    .derive(0 | 0x80000000) // Account index: 0'
-    .derive(ChainDerivation.EXTERNAL) //
-    .derive(0); // Address index: 0
-  const privateKey = paymentKey.to_raw_key();
-  const extendedKey = privateKey.to_hex().slice(4, 68);
-  return new PaymentSigningKey(extendedKey);
+    const rootKey = getRootKeyByMnemonic(mnemonic);
+    const paymentKey = rootKey // Derive the key using path 1852'/1815'/0'/0/0
+        .derive(Purpose.CIP1852 | 0x80000000)
+        .derive(CoinTypes.CARDANO | 0x80000000)
+        .derive(0 | 0x80000000) // Account index: 0'
+        .derive(ChainDerivation.EXTERNAL) //
+        .derive(0); // Address index: 0
+    const privateKey = paymentKey.to_raw_key();
+    const extendedKey = privateKey.to_hex().slice(4, 68);
+    return new PaymentSigningKey(extendedKey);
 }
 
 export class PaymentVerificationKey {
-  public type: string;
-  public description: string;
-  public cborHex: string;
-  private vkey: CardanoWasm.PublicKey;
+    public type: string;
+    public description: string;
+    public cborHex: string;
+    private vkey: CardanoWasm.PublicKey;
 
-  constructor(skey: string | PaymentSigningKey) {
-    if (skey instanceof PaymentSigningKey) {
-      const pskey = CardanoWasm.PrivateKey.from_hex(skey.cborHex.slice(4));
-      this.vkey = pskey.to_public();
-    } else {
-      if (skey.length !== 68) {
-        throw new Error('Invalid extended key');
-      }
-      const pskey = CardanoWasm.PrivateKey.from_hex(skey.slice(4));
-      this.vkey = pskey.to_public();
+    constructor(skey: string | PaymentSigningKey) {
+        if (skey instanceof PaymentSigningKey) {
+            const pskey = CardanoWasm.PrivateKey.from_hex(skey.cborHex.slice(4));
+            this.vkey = pskey.to_public();
+        } else {
+            if (skey.length !== 68) {
+                throw new Error('Invalid extended key');
+            }
+            const pskey = CardanoWasm.PrivateKey.from_hex(skey.slice(4));
+            this.vkey = pskey.to_public();
+        }
+        this.type = 'PaymentVerificationKeyShelley_ed25519';
+        this.description = 'Generated by Hexcore';
+        this.cborHex = `5820${this.vkey.to_hex()}`;
     }
-    this.type = 'PaymentVerificationKeyShelley_ed25519';
-    this.description = 'Generated by Hexcore';
-    this.cborHex = `5820${this.vkey.to_hex()}`;
-  }
 
-  toJSON(replacer?: any, space?: string | number) {
-    return JSON.stringify(
-      {
-        type: this.type,
-        description: this.description,
-        cborHex: this.cborHex,
-      },
-      replacer,
-      space,
-    );
-  }
+    toJSON(replacer?: any, space?: string | number) {
+        return JSON.stringify(
+            {
+                type: this.type,
+                description: this.description,
+                cborHex: this.cborHex,
+            },
+            replacer,
+            space,
+        );
+    }
 
-  toPointerAddress(networkId: number) {
-    const pointerAddr = CardanoWasm.EnterpriseAddress.new(
-      networkId,
-      CardanoWasm.Credential.from_keyhash(this.vkey.hash()),
-    );
-    return pointerAddr;
-  }
+    toPointerAddress(networkId: number) {
+        const pointerAddr = CardanoWasm.EnterpriseAddress.new(
+            networkId,
+            CardanoWasm.Credential.from_keyhash(this.vkey.hash()),
+        );
+        return pointerAddr;
+    }
 }
 export function getVerificationKeyFromSigningKey(skey: PaymentSigningKey): PaymentVerificationKey {
-  return new PaymentVerificationKey(skey);
+    return new PaymentVerificationKey(skey);
 }
 
 export function getEnterpriseAddressFromKeys(skey: `5820${string}`, vkey: `5820${string}`, networkId: number) {
-  const cliWallet = new CardanoCliWallet({
-    networkId: networkId,
-    skey: skey,
-    vkey: vkey
-  })
-  return cliWallet.getAddressBech32();
+    const cliWallet = new CardanoCliWallet({
+        networkId: networkId,
+        skey: skey,
+        vkey: vkey,
+    });
+    return cliWallet.getAddressBech32();
 }
 
 export function getKeyPairFromMnemonic(mnemonic: string) {

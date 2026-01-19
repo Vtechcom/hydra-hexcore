@@ -29,11 +29,7 @@ export abstract class BaseApiService {
     /**
      * POST request
      */
-    protected async post<T = any>(
-        url: string,
-        data?: any,
-        config?: AxiosRequestConfig,
-    ): Promise<T> {
+    protected async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
         return this.request<T>('POST', url, data, config);
     }
 
@@ -47,11 +43,7 @@ export abstract class BaseApiService {
     /**
      * PATCH request
      */
-    protected async patch<T = any>(
-        url: string,
-        data?: any,
-        config?: AxiosRequestConfig,
-    ): Promise<T> {
+    protected async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
         return this.request<T>('PATCH', url, data, config);
     }
 
@@ -113,10 +105,7 @@ export abstract class BaseApiService {
             // API trả về lỗi
             const status = error.response.status || HttpStatus.BAD_GATEWAY;
             const errorData: ApiErrorResponse = {
-                message:
-                    error.response.data?.message ||
-                    error.response.data?.detail ||
-                    'External API error',
+                message: error.response.data?.message || error.response.data?.detail || 'External API error',
                 statusCode: status,
                 error: error.response.data?.error || 'External API Error',
                 details: error.response.data,
