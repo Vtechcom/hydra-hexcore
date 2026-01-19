@@ -82,7 +82,7 @@ export class HydraHeadService {
                 await chmodSync(headDirPath, 0o775);
             }
 
-            if (process.env.CONNECT_CARDANO !== 'cardano-node' && body.blockfrostProjectId) {
+            if (this.configService.get('CARDANO_CONNECTION_MODE') !== 'cardano-node' && body.blockfrostProjectId) {
                 const blockfrostFilePath = `${headDirPath}/blockfrost-project.txt`;
                 await this.writeFile(blockfrostFilePath, body.blockfrostProjectId);
             }
