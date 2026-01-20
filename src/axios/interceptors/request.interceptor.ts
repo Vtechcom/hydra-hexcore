@@ -15,8 +15,7 @@ export class RequestInterceptor {
             this.logger.debug(`[Request] ${config.method?.toUpperCase()} ${config.url}`);
         }
 
-        const hasAuthorizationHeader =
-            !!config.headers?.Authorization || !!config.headers?.authorization;
+        const hasAuthorizationHeader = !!config.headers?.Authorization || !!config.headers?.authorization;
 
         if (!hasAuthorizationHeader) {
             config.headers = {

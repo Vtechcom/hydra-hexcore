@@ -1,12 +1,12 @@
 import { IsNumber, IsString } from 'class-validator';
 
 export class OpenHydraDto {
-  @IsNumber()
-  partyId: number;
+    @IsNumber()
+    partyId: number;
 
-  @IsNumber()
-  hydraHeadId: number;
+    @IsNumber()
+    hydraHeadId: number;
 
-  @IsString()
-  transaction: string;
+    @IsString()
+    transaction: string;
 }

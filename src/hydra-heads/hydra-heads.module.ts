@@ -23,7 +23,7 @@ import { BlockFrostApiService } from 'src/blockfrost/blockfrost-api.service';
         DockerModule,
         AxiosModule,
     ],
-    providers: [HydraHeadService, OgmiosClientService, HydraConfig, BlockFrostApiService,],
+    providers: [HydraHeadService, OgmiosClientService, HydraConfig, BlockFrostApiService],
     controllers: [HydraHeadController],
     exports: [HydraHeadService, HydraConfig],
 })

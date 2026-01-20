@@ -29,6 +29,7 @@ import { resolveHydraNodeName } from './utils/name-resolver';
 import { OgmiosClientService } from './ogmios-client.service';
 import { convertUtxoToUTxOObject } from './utils/ogmios-converter';
 import { ProviderUtils } from '@hydra-sdk/core';
+import { ConfigService } from '@nestjs/config';
 
 type ContainerNode = {
     hydraNodeId: string;
@@ -96,6 +97,7 @@ export class HydraMainService implements OnModuleInit {
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
         private ogmiosClientService: OgmiosClientService,
+        private configService: ConfigService,
     ) {
         const DOCKER_SOCKET = process.env.NEST_DOCKER_SOCKET_PATH || '\\\\.\\pipe\\docker_engine';
         this.docker = new Docker({ socketPath: DOCKER_SOCKET });
@@ -104,100 +106,102 @@ export class HydraMainService implements OnModuleInit {
     async onModuleInit() {
         console.log('onModuleInit');
         console.log('[LOAD ENVs]', this.CONSTANTS);
-        const listContainers = await this.docker.listContainers({ all: true });
+        if (this.configService.get('CARDANO_CONNECTION_MODE') === 'cardano-node') {
+            const listContainers = await this.docker.listContainers({ all: true });
 
-        const cardanoNodeContainer = listContainers.find(
-            container => container.Image === this.CONSTANTS.cardanoNodeImage,
-        );
-        if (cardanoNodeContainer && cardanoNodeContainer.State !== 'running') {
-            console.log('Cardano node is not running');
-            
-            // Ensure hydra-network exists
-            await this.ensureHydraNetwork();
-            
-            // Check if container is connected to hydra-network
-            const containerInfo = await this.docker.getContainer(cardanoNodeContainer.Id).inspect();
-            const isConnectedToHydraNetwork = containerInfo.NetworkSettings.Networks['hydra-network'];
-            
-            if (!isConnectedToHydraNetwork) {
-                console.log('Connecting cardano-node to hydra-network');
-                const hydraNetwork = this.docker.getNetwork('hydra-network');
-                await hydraNetwork.connect({
-                    Container: cardanoNodeContainer.Id
-                });
-            }
-            
-            // delete node.socket to restart docker
-            await this.docker.getContainer(cardanoNodeContainer.Id).restart();
-            this.cardanoNode.container = this.docker.getContainer(cardanoNodeContainer.Id);
-        } else if (!cardanoNodeContainer) {
-            console.log('Cardano node is not running, try to run cardano-node');
-            
-            // Ensure hydra-network exists before creating cardano-node
-            await this.ensureHydraNetwork();
+            const cardanoNodeContainer = listContainers.find(
+                container => container.Image === this.CONSTANTS.cardanoNodeImage,
+            );
+            if (cardanoNodeContainer && cardanoNodeContainer.State !== 'running') {
+                console.log('Cardano node is not running');
 
-            const container = await this.docker.createContainer({
-                Image: this.CONSTANTS.cardanoNodeImage,
-                name: this.CONSTANTS.cardanoNodeServiceName,
-                HostConfig: {
-                    NetworkMode: 'hydra-network', // Connect to the same network as Hydra nodes
-                    Binds: [
-                        `${this.CONSTANTS.cardanoNodeFolder}/database:/db`, // Map local ./database to /db
-                        `${this.CONSTANTS.cardanoNodeFolder}:/workspace`, // Map local ./ to /workspace
+                // Ensure hydra-network exists
+                await this.ensureHydraNetwork();
+
+                // Check if container is connected to hydra-network
+                const containerInfo = await this.docker.getContainer(cardanoNodeContainer.Id).inspect();
+                const isConnectedToHydraNetwork = containerInfo.NetworkSettings.Networks['hydra-network'];
+
+                if (!isConnectedToHydraNetwork) {
+                    console.log('Connecting cardano-node to hydra-network');
+                    const hydraNetwork = this.docker.getNetwork('hydra-network');
+                    await hydraNetwork.connect({
+                        Container: cardanoNodeContainer.Id,
+                    });
+                }
+
+                // delete node.socket to restart docker
+                await this.docker.getContainer(cardanoNodeContainer.Id).restart();
+                this.cardanoNode.container = this.docker.getContainer(cardanoNodeContainer.Id);
+            } else if (!cardanoNodeContainer) {
+                console.log('Cardano node is not running, try to run cardano-node');
+
+                // Ensure hydra-network exists before creating cardano-node
+                await this.ensureHydraNetwork();
+
+                const container = await this.docker.createContainer({
+                    Image: this.CONSTANTS.cardanoNodeImage,
+                    name: this.CONSTANTS.cardanoNodeServiceName,
+                    HostConfig: {
+                        NetworkMode: 'hydra-network', // Connect to the same network as Hydra nodes
+                        Binds: [
+                            `${this.CONSTANTS.cardanoNodeFolder}/database:/db`, // Map local ./database to /db
+                            `${this.CONSTANTS.cardanoNodeFolder}:/workspace`, // Map local ./ to /workspace
+                        ],
+                        PortBindings: {
+                            '8091/tcp': [{ HostPort: '8091' }], // Map port 8091
+                        },
+                        RestartPolicy: {
+                            Name: 'always', // Equivalent to `restart: always`
+                        },
+                    },
+                    Cmd: [
+                        'run',
+                        '--config',
+                        '/workspace/config.json',
+                        '--topology',
+                        '/workspace/topology.json',
+                        '--socket-path',
+                        '/workspace/node.socket',
+                        '--database-path',
+                        '/db',
+                        '--port',
+                        '8091',
+                        '--host-addr',
+                        '0.0.0.0',
                     ],
-                    PortBindings: {
-                        '8091/tcp': [{ HostPort: '8091' }], // Map port 8091
+                    ExposedPorts: {
+                        '8091/tcp': {},
                     },
-                    RestartPolicy: {
-                        Name: 'always', // Equivalent to `restart: always`
-                    },
-                },
-                Cmd: [
-                    'run',
-                    '--config',
-                    '/workspace/config.json',
-                    '--topology',
-                    '/workspace/topology.json',
-                    '--socket-path',
-                    '/workspace/node.socket',
-                    '--database-path',
-                    '/db',
-                    '--port',
-                    '8091',
-                    '--host-addr',
-                    '0.0.0.0',
-                ],
-                ExposedPorts: {
-                    '8091/tcp': {},
-                },
-            });
+                });
 
-            // Start the container
-            await container.start();
-            this.cardanoNode.container = container;
-        }
-        this.cardanoNode.container = this.docker.getContainer(cardanoNodeContainer.Id);
-        
-        // Ensure the cardano-node container is connected to hydra-network (even if already running)
-        await this.ensureCardanoNodeNetworkConnection(cardanoNodeContainer.Id);
-        const output = await this.execInContainer(this.CONSTANTS.cardanoNodeServiceName, [
-            'cardano-cli',
-            'query',
-            'tip',
-            `--socket-path`,
-            `/workspace/node.socket`,
-            '--testnet-magic',
-            '1',
-        ]);
-        this.logger.verbose('>>> / file: hydra-main.service.ts:121 / execInContainer:', output);
-        this.updateHydraContainerStatus();
-        try {
-            const tip = await this.cardanoQueryTip();
-            this.logger.log('>>> / file: hydra-main.service.ts:121 / tip:', tip);
-            this.cardanoNode.tip = tip;
-            await this.cacheManager.set('cardanoNodeTip', tip);
-        } catch (err) {
-            this.logger.error('Error parse json', err);
+                // Start the container
+                await container.start();
+                this.cardanoNode.container = container;
+            }
+            this.cardanoNode.container = this.docker.getContainer(cardanoNodeContainer.Id);
+
+            // Ensure the cardano-node container is connected to hydra-network (even if already running)
+            await this.ensureCardanoNodeNetworkConnection(cardanoNodeContainer.Id);
+            const output = await this.execInContainer(this.CONSTANTS.cardanoNodeServiceName, [
+                'cardano-cli',
+                'query',
+                'tip',
+                `--socket-path`,
+                `/workspace/node.socket`,
+                '--testnet-magic',
+                '1',
+            ]);
+            this.logger.verbose('>>> / file: hydra-main.service.ts:121 / execInContainer:', output);
+            this.updateHydraContainerStatus();
+            try {
+                const tip = await this.cardanoQueryTip();
+                this.logger.log('>>> / file: hydra-main.service.ts:121 / tip:', tip);
+                this.cardanoNode.tip = tip;
+                await this.cacheManager.set('cardanoNodeTip', tip);
+            } catch (err) {
+                this.logger.error('Error parse json', err);
+            }
         }
         return;
     }
@@ -233,6 +237,9 @@ export class HydraMainService implements OnModuleInit {
     }
 
     async testOgmiosConnection() {
+        if (this.configService.get('CARDANO_CONNECTION_MODE') !== 'cardano-node') {
+            return 'Connected via Blockfrost API';
+        }
         return this.ogmiosClientService.test();
     }
 
@@ -247,6 +254,9 @@ export class HydraMainService implements OnModuleInit {
     }
 
     async getCardanoNodeInfo() {
+        if (this.configService.get('CARDANO_CONNECTION_MODE') !== 'cardano-node') {
+            return 'Connected via Blockfrost API';
+        }
         const tip = await this.ogmiosClientService.queryTip();
         const protocolParameters = await this.ogmiosClientService.getProtocolParameters();
         return {
@@ -520,17 +530,17 @@ export class HydraMainService implements OnModuleInit {
 
     async ensureHydraNetwork(): Promise<void> {
         const networkName = 'hydra-network';
-        
+
         try {
             // Check if network already exists
             const networks = await this.docker.listNetworks();
             const existingNetwork = networks.find(network => network.Name === networkName);
-            
+
             if (existingNetwork) {
                 console.log(`Network ${networkName} already exists`);
                 return;
             }
-            
+
             // Create the network if it doesn't exist
             console.log(`Creating Docker network: ${networkName}`);
             await this.docker.createNetwork({
@@ -539,7 +549,6 @@ export class HydraMainService implements OnModuleInit {
                 CheckDuplicate: true,
             });
             console.log(`Network ${networkName} created successfully`);
-            
         } catch (error: any) {
             console.error(`Error ensuring network ${networkName}:`, error.message);
             throw new Error(`Failed to ensure network ${networkName}: ${error.message}`);
@@ -550,22 +559,21 @@ export class HydraMainService implements OnModuleInit {
         try {
             // Ensure hydra-network exists first
             await this.ensureHydraNetwork();
-            
+
             // Check if container is connected to hydra-network
             const containerInfo = await this.docker.getContainer(containerId).inspect();
             const isConnectedToHydraNetwork = containerInfo.NetworkSettings.Networks['hydra-network'];
-            
+
             if (!isConnectedToHydraNetwork) {
                 console.log('Connecting cardano-node to hydra-network');
                 const hydraNetwork = this.docker.getNetwork('hydra-network');
                 await hydraNetwork.connect({
-                    Container: containerId
+                    Container: containerId,
                 });
                 console.log('Cardano-node successfully connected to hydra-network');
             } else {
                 console.log('Cardano-node is already connected to hydra-network');
             }
-            
         } catch (error: any) {
             console.error(`Error ensuring cardano-node network connection:`, error.message);
             // Don't throw here as this is not critical for startup
@@ -586,29 +594,33 @@ export class HydraMainService implements OnModuleInit {
         try {
             // Check if container is properly connected to the network
             const isInitiallyConnected = await this.checkContainerNetworkConnection(containerId, networkName);
-            
+
             if (!isInitiallyConnected) {
-                console.log(`Container ${containerId} not properly connected to ${networkName}, attempting to reconnect...`);
-                
+                console.log(
+                    `Container ${containerId} not properly connected to ${networkName}, attempting to reconnect...`,
+                );
+
                 const network = this.docker.getNetwork(networkName);
-                
+
                 // Try to disconnect first (in case it's partially connected)
                 try {
                     await network.disconnect({ Container: containerId, Force: true });
                 } catch (disconnectError) {
                     // Ignore disconnect errors
                 }
-                
+
                 // Reconnect to network
                 await network.connect({
-                    Container: containerId
+                    Container: containerId,
                 });
-                
+
                 console.log(`Container ${containerId} successfully reconnected to ${networkName}`);
             } else {
                 const containerInfo = await this.docker.getContainer(containerId).inspect();
                 const networkSettings = containerInfo.NetworkSettings.Networks[networkName];
-                console.log(`Container ${containerId} is properly connected to ${networkName} with IP: ${networkSettings.IPAddress}`);
+                console.log(
+                    `Container ${containerId} is properly connected to ${networkName} with IP: ${networkSettings.IPAddress}`,
+                );
             }
         } catch (error: any) {
             console.error(`Error ensuring container network connection:`, error.message);
@@ -720,7 +732,9 @@ export class HydraMainService implements OnModuleInit {
         }
 
         // All attempts failed
-        throw new Error(`Failed to start/create container ${nodeName} after ${retryCount + 1} attempts: ${lastError?.message}`);
+        throw new Error(
+            `Failed to start/create container ${nodeName} after ${retryCount + 1} attempts: ${lastError?.message}`,
+        );
     }
 
     /**

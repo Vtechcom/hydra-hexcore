@@ -90,10 +90,7 @@ describe('Authentication (e2e)', () => {
             });
 
             it('should fail login with missing credentials', async () => {
-                await request(app.getHttpServer())
-                    .post('/hydra-main/login')
-                    .send({})
-                    .expect(400);
+                await request(app.getHttpServer()).post('/hydra-main/login').send({}).expect(400);
             });
         });
 
@@ -119,9 +116,7 @@ describe('Authentication (e2e)', () => {
             });
 
             it('should fail authorization without token', async () => {
-                await request(app.getHttpServer())
-                    .get('/hydra-main/auth')
-                    .expect(401);
+                await request(app.getHttpServer()).get('/hydra-main/auth').expect(401);
             });
 
             it('should fail authorization with invalid token', async () => {
@@ -140,8 +135,9 @@ describe('Authentication (e2e)', () => {
 
             it('should fail authorization with expired token', async () => {
                 // Token đã hết hạn (expired in 2020)
-                const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwiaWQiOjEsImlhdCI6MTYwOTQ1OTIwMCwiZXhwIjoxNjA5NDU5MjAxfQ.invalidSignature';
-                
+                const expiredToken =
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwiaWQiOjEsImlhdCI6MTYwOTQ1OTIwMCwiZXhwIjoxNjA5NDU5MjAxfQ.invalidSignature';
+
                 await request(app.getHttpServer())
                     .get('/hydra-main/auth')
                     .set('Authorization', `Bearer ${expiredToken}`)

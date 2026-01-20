@@ -1,15 +1,15 @@
 import { Exclude } from 'class-transformer';
 
 export class ResCardanoAccountDto {
-  id: number;
+    id: number;
 
-  baseAddress: string;
+    baseAddress: string;
 
-  mnemonic: string;
+    mnemonic: string;
 
-  createdAt: string;
+    createdAt: string;
 
-  constructor(partial: Partial<ResCardanoAccountDto>) {
-    Object.assign(this, partial);
-  }
+    constructor(partial: Partial<ResCardanoAccountDto>) {
+        Object.assign(this, partial);
+    }
 }

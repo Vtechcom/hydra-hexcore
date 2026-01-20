@@ -1,18 +1,17 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from "@nestjs/common";
-import { HydraHeadService } from "./hydra-heads.service";
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { CreateHydraHeadsDto } from "./dto/create-hydra-heads.dto";
-import { AdminAuthGuard } from "src/auth/admin-auth.guard";
-import { ActiveHydraHeadsDto } from "./dto/active-hydra-heads.dto";
-import { ClearHeadDataDto } from "./dto/clear-head-data.dto";
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { HydraHeadService } from './hydra-heads.service';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { CreateHydraHeadsDto } from './dto/create-hydra-heads.dto';
+import { AdminAuthGuard } from 'src/auth/admin-auth.guard';
+import { ActiveHydraHeadsDto } from './dto/active-hydra-heads.dto';
+import { ClearHeadDataDto } from './dto/clear-head-data.dto';
+import { ParseIntPipe } from '@nestjs/common';
 
 @ApiTags('Hydra Heads')
 @Controller('hydra-heads')
 @ApiBearerAuth()
 export class HydraHeadController {
-    constructor(
-        private readonly hydraHeadService: HydraHeadService,
-    ) {}
+    constructor(private readonly hydraHeadService: HydraHeadService) {}
 
     @UseGuards(AdminAuthGuard)
     @Post('create')
@@ -49,14 +48,14 @@ export class HydraHeadController {
 
     @UseGuards(AdminAuthGuard)
     @Delete('delete/:id')
-    async delete (@Param('id') id: number) {
+    async delete(@Param('id', ParseIntPipe) id: number) {
         return this.hydraHeadService.delete(id);
     }
 
     @UseGuards(AdminAuthGuard)
     @Post('restart/:id')
     @HttpCode(200)
-    async restart(@Param('id') id: number) {
+    async restart(@Param('id', ParseIntPipe) id: number) {
         return this.hydraHeadService.restart(id);
     }
 }

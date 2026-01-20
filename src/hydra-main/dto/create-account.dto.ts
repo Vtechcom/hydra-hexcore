@@ -5,7 +5,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 export class CreateAccountDto {
     @ApiProperty({
         description: 'Mnemonic for the new account',
-        example: generateMnemonic(128)
+        example: generateMnemonic(128),
     })
     @IsString()
     @IsNotEmpty()

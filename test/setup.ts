@@ -4,6 +4,7 @@ import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
 import { DockerService } from 'src/docker/docker.service';
 import { OgmiosClientService } from 'src/hydra-main/ogmios-client.service';
+import { BlockFrostApiService } from 'src/blockfrost/blockfrost-api.service';
 
 /**
  * Setup shared test application (Full App)
@@ -113,6 +114,7 @@ export async function createHydraHeadTestApp(): Promise<{
         updateHydraContainerStatus: jest.fn(),
         handleDockerContainerExist: jest.fn(),
         cleanupContainer: jest.fn(),
+        getDockerContainerName: jest.fn(),
     };
 
     // Make some methods return promises by default to match real service behavior
@@ -129,6 +131,7 @@ export async function createHydraHeadTestApp(): Promise<{
     mockDockerService.updateHydraContainerStatus.mockResolvedValue(undefined);
     mockDockerService.handleDockerContainerExist.mockResolvedValue(undefined);
     mockDockerService.cleanupContainer.mockResolvedValue(undefined);
+    mockDockerService.getDockerContainerName.mockResolvedValue(undefined);
 
     const mockOgmios = {
         queryUtxoByAddress: jest.fn(),
@@ -136,11 +139,36 @@ export async function createHydraHeadTestApp(): Promise<{
         queryProtocolParameters: jest.fn(),
     };
 
+    const mockBlockfrostApiService = {
+        getProtocolParameters: jest.fn().mockResolvedValue({
+            minFeeA: 44,
+            minFeeB: 155381,
+            maxTxSize: 16384,
+            maxBlockHeaderSize: 1100,
+            keyDeposit: 2000000,
+            poolDeposit: 500000000,
+            minPoolCost: 340000000,
+            priceMem: 0.0577,
+            priceStep: 0.0000721,
+            maxTxExMem: 14000000,
+            maxTxExSteps: 10000000000,
+            maxBlockExMem: 62000000,
+            maxBlockExSteps: 20000000000,
+            maxValSize: 5000,
+            collateralPercentage: 150,
+            maxCollateralInputs: 3,
+            coinsPerUtxoSize: 4310,
+        }),
+        getAddressUtxos: jest.fn().mockResolvedValue([]),
+    };
+
     const moduleFixture: TestingModule = await moduleBuilder
         .overrideProvider(DockerService)
         .useValue(mockDockerService)
         .overrideProvider(OgmiosClientService)
         .useValue(mockOgmios)
+        .overrideProvider(BlockFrostApiService)
+        .useValue(mockBlockfrostApiService)
         .compile();
 
     const app = moduleFixture.createNestApplication();
@@ -174,12 +202,12 @@ export async function cleanupTestApp(app: INestApplication, dataSource: DataSour
         }
 
         try {
-            const redisService = app.get('RedisService', { strict: false });
-            if (redisService && typeof redisService.onModuleDestroy === 'function') {
-                await redisService.onModuleDestroy();
+            const cacheManager = app.get('CACHE_MANAGER', { strict: false });
+            if (cacheManager && typeof cacheManager.reset === 'function') {
+                await cacheManager.reset();
             }
         } catch (e) {
-            // Redis không có thì bỏ qua
+            // Cache manager reset failed, ignore
         }
 
         const server = app.getHttpServer();

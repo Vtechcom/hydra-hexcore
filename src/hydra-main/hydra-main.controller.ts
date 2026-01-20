@@ -108,7 +108,7 @@ export class HydraMainController {
     @Get('utxo/:address')
     async getListUtxo(@Param('address') address: string): Promise<AddressUtxoDto> {
         const rs = await this.hydraMainService.getAddressUtxo(address);
-        return rs
+        return rs;
     }
 
     @ApiOperation({ summary: 'Get active nodes' })
