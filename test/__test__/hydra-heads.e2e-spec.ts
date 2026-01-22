@@ -641,10 +641,6 @@ describe('Hydra Head Service(e2e)', () => {
         let headToDeleteId: number;
 
         beforeEach(async () => {
-            // Ensure fs mocks are working for this test
-            (fs.access as unknown as jest.Mock).mockResolvedValue(undefined);
-            (fs.mkdir as unknown as jest.Mock).mockResolvedValue(undefined);
-
             // Create a hydra head to delete
             const createResponse = await request(app.getHttpServer())
                 .post('/hydra-heads/create')
