@@ -702,6 +702,16 @@ export class HydraHeadService {
             }
         }
 
+        try {
+            // Remove head directory
+            const headDirPath = resolveHeadDirPath(head.id, this.hydraConfig.hydraNodeFolder);
+            await access(headDirPath, constants.R_OK | constants.W_OK);
+            await rm(headDirPath, { recursive: true, force: true });
+            console.log(`Removed head directory: ${headDirPath}`);
+        } catch (error) {
+            console.log(`Error removing head directory: ${error.message}`);
+        }
+
         // Remove DB in transaction
         await this.dataSource.transaction(async manager => {
             await manager.delete(HydraNode, {
