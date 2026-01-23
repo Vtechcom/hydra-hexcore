@@ -7,6 +7,7 @@ import { HydraNode } from 'src/hydra-main/entities/HydraNode.entity';
 import * as net from 'net';
 import { Account } from 'src/hydra-main/entities/Account.entity';
 import { Logger } from '@nestjs/common';
+import WebSocket from 'ws';
 import { resolveHeadDirPath, resolvePersistenceDir } from 'src/hydra-main/utils/path-resolver';
 import { access, constants, mkdir, rm } from 'node:fs/promises';
 import { chmodSync, writeFileSync } from 'node:fs';
@@ -391,12 +392,17 @@ export class HydraHeadService {
                 };
             }
 
+            // Update Redis cache - add newly activated nodes
+            await this.updateRedisActiveNodes(head, createdContainers);
+
+            // Wait for all nodes to be ready (receive Greetings with headStatus: Idle)
+            this.logger.log(`Waiting for all ${head.hydraNodes.length} nodes to be ready...`);
+            await this.waitForAllNodesReady(head.hydraNodes, 60000, 2000); // 60s timeout, 2s retry interval
+            this.logger.log(`All nodes for Head ${head.id} are ready and accepting connections!`);
+
             // All containers started successfully
             head.status = 'running';
             await this.hydraHeadRepository.save(head);
-
-            // Update Redis cache - add newly activated nodes
-            await this.updateRedisActiveNodes(head, createdContainers);
         } catch (error: any) {
             // If any container fails, cleanup all created containers
             this.logger.error(`Error activating head ${head.id}: ${error.message}`);
@@ -593,6 +599,150 @@ export class HydraHeadService {
 
     getDockerContainerName(hydraNode: HydraNode) {
         return resolveHydraNodeName(hydraNode.id);
+    }
+
+    /**
+     * Check if a single Hydra node is ready by connecting to its WebSocket API
+     * and waiting for a Greetings message with headStatus: "Idle"
+     * @param port - The API port of the Hydra node
+     * @param timeoutMs - Maximum time to wait for the node to be ready (default: 60000ms)
+     * @returns Promise<boolean> - True if the node is ready, false otherwise
+     */
+    async checkNodeReady(port: number, timeoutMs: number = 60000): Promise<boolean> {
+        return new Promise(resolve => {
+            const wsUrl = `ws://localhost:${port}`;
+            let ws: WebSocket | null = null;
+            let timeoutId: NodeJS.Timeout | null = null;
+            let resolved = false;
+
+            const cleanup = () => {
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                if (ws) {
+                    try {
+                        ws.close();
+                    } catch (e) {
+                        // Ignore close errors
+                    }
+                    ws = null;
+                }
+            };
+
+            const resolveOnce = (value: boolean) => {
+                if (!resolved) {
+                    resolved = true;
+                    cleanup();
+                    resolve(value);
+                }
+            };
+
+            // Set timeout
+            timeoutId = setTimeout(() => {
+                this.logger.warn(`Node at port ${port} did not become ready within ${timeoutMs}ms`);
+                resolveOnce(false);
+            }, timeoutMs);
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.on('open', () => {
+                    this.logger.log(`WebSocket connected to node at port ${port}`);
+                });
+
+                ws.on('message', (data: Buffer) => {
+                    try {
+                        const message = JSON.parse(data.toString());
+                        if (message.tag === 'Greetings' && message.headStatus === 'Idle') {
+                            this.logger.log(`Node at port ${port} is ready (headStatus: Idle)`);
+                            resolveOnce(true);
+                        }
+                    } catch (e) {
+                        this.logger.error(`Error parsing message from node at port ${port}: ${e}`);
+                    }
+                });
+
+                ws.on('error', (error: Error) => {
+                    this.logger.error(`WebSocket error for node at port ${port}: ${error.message}`);
+                    // Don't resolve yet, let it retry via timeout or next attempt
+                });
+
+                ws.on('close', () => {
+                    this.logger.log(`WebSocket closed for node at port ${port}`);
+                });
+            } catch (error: any) {
+                this.logger.error(`Failed to connect to node at port ${port}: ${error.message}`);
+                resolveOnce(false);
+            }
+        });
+    }
+
+    /**
+     * Wait for all Hydra nodes to be ready before proceeding
+     * @param nodes - Array of HydraNode objects
+     * @param timeoutMs - Maximum time to wait for each node (default: 60000ms)
+     * @param retryIntervalMs - Interval between retry attempts (default: 2000ms)
+     * @returns Promise<void> - Resolves when all nodes are ready, throws if timeout
+     */
+    async waitForAllNodesReady(
+        nodes: HydraNode[],
+        timeoutMs: number = 60000,
+        retryIntervalMs: number = 2000,
+    ): Promise<void> {
+        const startTime = Date.now();
+        const nodeStatuses = new Map<number, boolean>();
+
+        // Initialize all nodes as not ready
+        for (const node of nodes) {
+            nodeStatuses.set(node.id, false);
+        }
+
+        this.logger.log(`Waiting for ${nodes.length} nodes to be ready...`);
+
+        while (Date.now() - startTime < timeoutMs) {
+            const pendingNodes = nodes.filter(node => !nodeStatuses.get(node.id));
+
+            if (pendingNodes.length === 0) {
+                this.logger.log('All nodes are ready!');
+                return;
+            }
+
+            // Check all pending nodes in parallel
+            const checkPromises = pendingNodes.map(async node => {
+                const isReady = await this.checkNodeReady(node.port, 5000);
+                if (isReady) {
+                    nodeStatuses.set(node.id, true);
+                    this.logger.log(`Node ${node.id} (port ${node.port}) is now ready`);
+                }
+                return { nodeId: node.id, isReady };
+            });
+
+            await Promise.all(checkPromises);
+
+            // Check if all nodes are ready
+            const allReady = nodes.every(node => nodeStatuses.get(node.id));
+            if (allReady) {
+                this.logger.log('All nodes are ready!');
+                return;
+            }
+
+            // Wait before next retry
+            const remainingNodes = nodes.filter(node => !nodeStatuses.get(node.id));
+            this.logger.log(
+                `Waiting for ${remainingNodes.length} nodes to be ready. ` +
+                    `Retrying in ${retryIntervalMs}ms... ` +
+                    `(${Math.round((Date.now() - startTime) / 1000)}s elapsed)`,
+            );
+            await new Promise(resolve => setTimeout(resolve, retryIntervalMs));
+        }
+
+        // Timeout reached
+        const notReadyNodes = nodes.filter(node => !nodeStatuses.get(node.id));
+        const notReadyPorts = notReadyNodes.map(n => n.port).join(', ');
+        throw new BadRequestException(
+            `Timeout waiting for nodes to be ready. The following nodes did not respond: ports [${notReadyPorts}]`,
+        );
     }
 
     async writeFile(filePath: string, content: string): Promise<void> {

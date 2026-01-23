@@ -95,6 +95,7 @@ describe('Hydra Head Service(e2e)', () => {
         (fsSync.chmodSync as unknown as jest.Mock).mockReturnValue(undefined);
 
         // Setup global spies
+        const awaitedHeadReadySpy = jest.spyOn(hydraHeadService, 'waitForAllNodesReady').mockResolvedValue(undefined);
         const checkUtxoSpy = jest.spyOn(hydraHeadService, 'checkUtxoAccount').mockResolvedValue(true);
         const writeFileSpy = jest.spyOn(hydraHeadService, 'writeFile').mockResolvedValue(undefined);
         const convertSpy = jest
@@ -104,7 +105,7 @@ describe('Hydra Head Service(e2e)', () => {
         const getCacheSpy = jest.spyOn(cacheManager, 'get').mockResolvedValue([]);
         const setCacheSpy = jest.spyOn(cacheManager, 'set').mockResolvedValue(undefined);
 
-        globalSpies = [checkUtxoSpy, writeFileSpy, convertSpy, updateRedisSpy, getCacheSpy, setCacheSpy];
+        globalSpies = [awaitedHeadReadySpy, checkUtxoSpy, writeFileSpy, convertSpy, updateRedisSpy, getCacheSpy, setCacheSpy];
     }, 30000);
 
     afterEach(async () => {
@@ -116,7 +117,7 @@ describe('Hydra Head Service(e2e)', () => {
         (fs.rm as unknown as jest.Mock).mockResolvedValue(undefined);
 
         // Reset cache spy về empty array
-        globalSpies[4]?.mockResolvedValue([]);
+        globalSpies[5]?.mockResolvedValue([]);
 
         await clearDatabase(dataSource);
     });
@@ -288,7 +289,7 @@ describe('Hydra Head Service(e2e)', () => {
 
         it('should fail to activate if wallet UTXO check fails', async () => {
             // Mock checkUtxoAccount to return false to simulate UTXO check failure
-            globalSpies[0].mockResolvedValueOnce(false);
+            globalSpies[1].mockResolvedValueOnce(false);
 
             const response = await request(app.getHttpServer())
                 .post('/hydra-heads/active')
@@ -300,11 +301,11 @@ describe('Hydra Head Service(e2e)', () => {
 
             expect(response.body).toHaveProperty('message');
             expect(response.body.message).toContain('not enough lovelace');
-            globalSpies[0].mockResolvedValue(true);
+            globalSpies[1].mockResolvedValue(true);
         });
 
         it('should fail to activate when max active nodes limit is reached', async () => {
-            globalSpies[4].mockResolvedValue(
+            globalSpies[5].mockResolvedValue(
                 Array.from({ length: Number(process.env.MAX_ACTIVE_NODES) }, (_, i) => ({
                     hydraNodeId: `h-${i + 1}`,
                     hydraHeadId: i + 1,
@@ -323,11 +324,11 @@ describe('Hydra Head Service(e2e)', () => {
             expect(response.body).toHaveProperty('message');
             expect(response.body.message).toContain('maximum active nodes limit');
 
-            globalSpies[4].mockResolvedValue([]);
+            globalSpies[5].mockResolvedValue([]);
         });
 
         it('should fail to activate when adding nodes would exceed limit', async () => {
-            globalSpies[4].mockResolvedValue(
+            globalSpies[5].mockResolvedValue(
                 Array.from({ length: Number(process.env.MAX_ACTIVE_NODES) - 2 }, (_, i) => ({
                     hydraNodeId: `h-${i + 1}`,
                     hydraHeadId: i + 1,
@@ -378,7 +379,7 @@ describe('Hydra Head Service(e2e)', () => {
             expect(response.body).toHaveProperty('message');
             expect(response.body.message).toContain('maximum active nodes limit');
 
-            globalSpies[4].mockResolvedValue([]);
+            globalSpies[5].mockResolvedValue([]);
         });
     });
 
@@ -432,7 +433,7 @@ describe('Hydra Head Service(e2e)', () => {
                 isActive: true,
             }));
 
-            globalSpies[4].mockResolvedValue(mockActiveNodes);
+            globalSpies[5].mockResolvedValue(mockActiveNodes);
 
             const activeNodes = await service.getActiveNodeContainers();
             expect(activeNodes.length).toBe(5);
@@ -440,7 +441,7 @@ describe('Hydra Head Service(e2e)', () => {
 
         it('should return 0 when cache is empty', async () => {
             // Mock cache returning empty array
-            globalSpies[4].mockResolvedValue([]);
+            globalSpies[5].mockResolvedValue([]);
 
             const activeNodes = await service.getActiveNodeContainers();
             expect(activeNodes.length).toBe(0);
@@ -448,7 +449,7 @@ describe('Hydra Head Service(e2e)', () => {
 
         it('should return 0 when cache returns null/undefined', async () => {
             // Mock cache returning null (not set yet)
-            globalSpies[4].mockResolvedValue(null);
+            globalSpies[5].mockResolvedValue(null);
 
             const activeNodes = await service.getActiveNodeContainers();
             expect(activeNodes.length).toBe(0);
@@ -479,7 +480,7 @@ describe('Hydra Head Service(e2e)', () => {
                     isActive: true,
                 },
             ];
-            globalSpies[4].mockResolvedValue(runningContainers);
+            globalSpies[5].mockResolvedValue(runningContainers);
 
             // Verify it's using getActiveNodeContainers which reads from cache
             const activeContainers = await service.getActiveNodeContainers();
@@ -510,7 +511,7 @@ describe('Hydra Head Service(e2e)', () => {
             const headId = createResponse.body.id;
 
             // Mock empty cache for activation
-            globalSpies[4].mockResolvedValue([]);
+            globalSpies[5].mockResolvedValue([]);
 
             // First, activate the head
             const activeResponse = await request(app.getHttpServer())
@@ -759,7 +760,7 @@ describe('Hydra Head Service(e2e)', () => {
                     ],
                 });
             const createvalueCache = await addActiveNodes(createResponse.body.nodes, createResponse.body.id);
-            globalSpies[4].mockResolvedValue(createvalueCache);
+            globalSpies[5].mockResolvedValue(createvalueCache);
             headId = createResponse.body.id;
         });
 
