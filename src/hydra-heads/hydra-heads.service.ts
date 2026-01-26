@@ -31,6 +31,9 @@ import { ProviderUtils } from '@hydra-sdk/core';
 import { BlockFrostApiService } from 'src/blockfrost/blockfrost-api.service';
 import { ConfigService } from '@nestjs/config';
 
+const TIMEOUT_NODE_READY_MS = 120000;
+const POLL_INTERVAL_NODE_READY_MS = 2000;
+
 @Injectable()
 export class HydraHeadService {
     private logger = new Logger(HydraHeadService.name);
@@ -397,7 +400,7 @@ export class HydraHeadService {
 
             // Wait for all nodes to be ready (receive Greetings with headStatus: Idle)
             this.logger.log(`Waiting for all ${head.hydraNodes.length} nodes to be ready...`);
-            await this.waitForAllNodesReady(head.hydraNodes, 60000, 2000); // 60s timeout, 2s retry interval
+            await this.waitForAllNodesReady(head.hydraNodes, TIMEOUT_NODE_READY_MS, POLL_INTERVAL_NODE_READY_MS);
             this.logger.log(`All nodes for Head ${head.id} are ready and accepting connections!`);
 
             // All containers started successfully
@@ -923,6 +926,7 @@ export class HydraHeadService {
         } catch (err) {
             throw new BadRequestException(`Failed to restart one or more containers: ${err.message}`);
         }
+        await this.waitForAllNodesReady(head.hydraNodes, TIMEOUT_NODE_READY_MS, POLL_INTERVAL_NODE_READY_MS);
 
         return {
             message: `Hydra Head ${id} containers have been restarted successfully.`,
