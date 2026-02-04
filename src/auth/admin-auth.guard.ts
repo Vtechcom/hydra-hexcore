@@ -1,9 +1,9 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { jwtConstants } from 'src/constants';
-import { JwtHelper } from './jwt.helper';
+import { jwtConstants } from 'src/common/constants';
+import { JwtHelper } from './helpers/jwt.helper';
 import { AdminJwtPayload } from 'src/common/interfaces/jwtPayload.type';
-import { Role } from 'src/enums/role.enum';
+import { Role } from 'src/auth/enums/role.enum';
 
 @Injectable()
 export class AdminAuthGuard implements CanActivate {

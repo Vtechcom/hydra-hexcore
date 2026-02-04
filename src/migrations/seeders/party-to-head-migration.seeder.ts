@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { AppDataSource } from '../data-source';
 import { HydraHead } from '../../hydra-heads/entities/HydraHead.entity';
 import { HydraNode } from '../../hydra-main/entities/HydraNode.entity';
-import { getKeyPairFromMnemonic } from '../../utils/cardano-core';
+import { getKeyPairFromMnemonic } from '../../common/utils/cardano-core';
 
 async function main() {
     console.log('Starting party to head migration seeder...');

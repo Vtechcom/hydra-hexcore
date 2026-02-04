@@ -12,7 +12,7 @@ import { resolveHeadDirPath, resolvePersistenceDir } from 'src/hydra-main/utils/
 import { access, constants, mkdir, rm } from 'node:fs/promises';
 import { chmodSync, writeFileSync } from 'node:fs';
 import { resolveHydraNodeName } from 'src/hydra-main/utils/name-resolver';
-import { generateKeyFile } from 'src/utils/generator.util';
+import { generateKeyFile } from 'src/common/utils/generator.util';
 import { ActiveHydraHeadsDto } from './dto/active-hydra-heads.dto';
 import { CardanoCliJs } from 'cardanocli-js';
 import Docker from 'dockerode';
@@ -20,7 +20,7 @@ import { DockerService } from 'src/docker/docker.service';
 import { convertUtxoToUTxOObject } from 'src/hydra-main/utils/ogmios-converter';
 import { OgmiosClientService } from 'src/hydra-main/ogmios-client.service';
 import { AddressUtxoDto } from 'src/hydra-main/dto/response/address-utxo.dto';
-import { getEnterpriseAddressFromKeys } from 'src/utils/cardano-core';
+import { getEnterpriseAddressFromKeys } from 'src/common/utils/cardano-core';
 import { HydraHeadKeys } from './interfaces/hydra-head-keys.type';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Caching } from 'src/common/interfaces/cache.type';
@@ -936,7 +936,7 @@ export class HydraHeadService {
                 const container = await this.dockerService.getContainerByName(nodeName);
                 containers.push(container);
             }
-            await this.dockerService.updateRedisActiveNodes(head, containers)
+            await this.dockerService.updateRedisActiveNodes(head, containers);
             await this.waitForAllNodesReady(head.hydraNodes, TIMEOUT_NODE_READY_MS, POLL_INTERVAL_NODE_READY_MS);
             this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, head.status));
         } catch (err) {

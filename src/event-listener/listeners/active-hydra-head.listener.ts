@@ -1,4 +1,4 @@
-import { HydraHubApiService } from 'src/hub-service/hydrahub-api.service';
+import { HydraHubApiService } from 'src/hydra-hub/hydrahub-api.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventEnum } from '../enums/event.enum';
 import { ActiveHydraHeadEvent } from '../events/active-hydra-head.event';

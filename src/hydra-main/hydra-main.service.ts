@@ -12,7 +12,7 @@ import {
     getSigningKeyFromMnemonic,
     NetworkInfo,
     PaymentVerificationKey,
-} from 'src/utils/cardano-core';
+} from 'src/common/utils/cardano-core';
 import { ResCardanoAccountDto } from './dto/response/cardano-account.dto';
 import { CardanoCliJs } from 'cardanocli-js';
 
@@ -21,7 +21,7 @@ import { CommitHydraDto } from './dto/request/commit-hydra.dto';
 import axios from 'axios';
 import { SubmitTxHydraDto } from './dto/request/submit-tx-hydra.dto';
 import { AddressUtxoDto } from './dto/response/address-utxo.dto';
-import { IPaginationOptions } from 'src/interfaces/pagination.type';
+import { IPaginationOptions } from 'src/common/interfaces/pagination.type';
 import { HydraDto } from './dto/hydra.dto';
 
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';

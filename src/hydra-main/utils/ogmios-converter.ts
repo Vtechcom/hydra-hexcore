@@ -2,7 +2,7 @@ import { Native, Plutus, Utxo } from '@cardano-ogmios/schema';
 import { ReferenceScript, UTxOObject, UTxOObjectValue } from '../dto/response/address-utxo.dto';
 
 import { CardanoWASM } from '@hydra-sdk/cardano-wasm';
-import { convertBigIntToString } from 'src/utils/bigint.utils';
+import { convertBigIntToString } from 'src/common/utils/bigint.utils';
 
 export const convertUtxoToUTxOObject = (utxos: Utxo): UTxOObject => {
     try {

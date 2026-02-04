@@ -12,7 +12,7 @@ import { Point } from '@cardano-ogmios/schema';
 
 import { ConfigService } from '@nestjs/config';
 import { LedgerStateQueryClient } from '@cardano-ogmios/client/dist/LedgerStateQuery';
-import { convertBigIntToString, safeStringify } from '../utils/bigint.utils';
+import { convertBigIntToString, safeStringify } from 'src/common/utils/bigint.utils';
 
 @Injectable()
 export class OgmiosClientService implements OnModuleInit, OnModuleDestroy {

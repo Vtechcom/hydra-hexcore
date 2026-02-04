@@ -2,8 +2,7 @@ import { ClassSerializerInterceptor, Controller, Get, Param, Query, UseIntercept
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiProperty } from '@nestjs/swagger';
 import { OgmiosClientService } from './ogmios-client.service';
 import { BigIntInterceptor, SimpleBigIntInterceptor } from '../common/interceptors/bigint.interceptor';
-import { ProtocolParametersDto, BigIntResponseDto, HealthResponseDto } from '../dto/ogmios.dto';
-import { Origin, Point } from '@cardano-ogmios/schema';
+import { ProtocolParametersDto, BigIntResponseDto, HealthResponseDto } from './dto/ogmios.dto';
 
 @ApiTags('Ogmios')
 @UseInterceptors(ClassSerializerInterceptor)

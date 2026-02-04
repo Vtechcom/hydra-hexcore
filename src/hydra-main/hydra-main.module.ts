@@ -7,7 +7,7 @@ import { Account } from './entities/Account.entity';
 import { HydraAdminService } from './hydra-admin.service';
 import { User } from './entities/User.entity';
 import { JwtModule } from '@nestjs/jwt';
-import { jwtConstants } from 'src/constants';
+import { jwtConstants } from 'src/common/constants';
 import { OgmiosClientService } from './ogmios-client.service';
 import { OgmiosController } from './ogmios.controller';
 @Module({

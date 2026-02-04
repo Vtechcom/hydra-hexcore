@@ -1,7 +1,7 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { convertBigIntToString, transformForApiResponse } from '../../utils/bigint.utils';
+import { convertBigIntToString, transformForApiResponse } from '../utils/bigint.utils';
 
 /**
  * Interceptor to automatically handle BigInt values in API responses
