@@ -71,5 +71,5 @@ export class CreateHydraHeadsDto {
         },
     })
     @IsOptional()
-    protocolParameters?: ProtocolParameterDto;
+    protocolParams?: ProtocolParameterDto;
 }
