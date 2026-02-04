@@ -13,6 +13,8 @@ import { CacheableMemory } from 'cacheable';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './config/winston.config';
 import { HydraHeadsModule } from './hydra-heads/hydra-heads.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { EventListenerModule } from './event-listener/event-listener.module';
 
 @Module({
     imports: [
@@ -23,6 +25,10 @@ import { HydraHeadsModule } from './hydra-heads/hydra-heads.module';
             isGlobal: true,
         }),
         ScheduleModule.forRoot(),
+        EventEmitterModule.forRoot({
+            // show event name in memory leak message when more than maximum amount of listeners is assigned
+            verboseMemoryLeak: true,
+        }),
         CacheModule.registerAsync({
             isGlobal: true,
             useFactory: async () => {
@@ -42,6 +48,7 @@ import { HydraHeadsModule } from './hydra-heads/hydra-heads.module';
         HydraMainModule,
         ShellModule,
         HydraHeadsModule,
+        EventListenerModule,
         TypeOrmModule.forRootAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({

@@ -30,6 +30,9 @@ import { CARDANO_SK, CARDANO_VK, HYDRA_SK, HYDRA_VK } from './contants/type-key.
 import { ProviderUtils } from '@hydra-sdk/core';
 import { BlockFrostApiService } from 'src/blockfrost/blockfrost-api.service';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEnum } from 'src/event-listener/enums/event.enum';
+import { ActiveHydraHeadEvent } from 'src/event-listener/events/active-hydra-head.event';
 
 const TIMEOUT_NODE_READY_MS = 120000;
 const POLL_INTERVAL_NODE_READY_MS = 2000;
@@ -52,6 +55,7 @@ export class HydraHeadService {
         @Inject(HYDRA_CONFIG) private readonly hydraConfig: HydraConfigInterface,
         private readonly blockfrostApiService: BlockFrostApiService,
         private readonly configService: ConfigService,
+        private readonly eventEmitter: EventEmitter2,
     ) {}
 
     async create(body: CreateHydraHeadsDto) {
@@ -396,7 +400,7 @@ export class HydraHeadService {
             }
 
             // Update Redis cache - add newly activated nodes
-            await this.updateRedisActiveNodes(head, createdContainers);
+            await this.dockerService.updateRedisActiveNodes(head, createdContainers);
 
             // Wait for all nodes to be ready (receive Greetings with headStatus: Idle)
             this.logger.log(`Waiting for all ${head.hydraNodes.length} nodes to be ready...`);
@@ -406,6 +410,8 @@ export class HydraHeadService {
             // All containers started successfully
             head.status = 'running';
             await this.hydraHeadRepository.save(head);
+
+            this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, head.status));
         } catch (error: any) {
             // If any container fails, cleanup all created containers
             this.logger.error(`Error activating head ${head.id}: ${error.message}`);
@@ -421,6 +427,7 @@ export class HydraHeadService {
 
             head.status = 'stop';
             await this.hydraHeadRepository.save(head);
+            this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, head.status));
 
             throw new BadRequestException(`Failed to activate head: ${error.message}`);
         }
@@ -917,63 +924,39 @@ export class HydraHeadService {
 
         // All nodes are active, proceed with restart
         try {
+            let containers: Docker.Container[] = [];
             await Promise.all(
                 head.hydraNodes.map(node => {
                     const nodeName = this.getDockerContainerName(node);
                     return this.dockerService.restartContainerByName(nodeName);
                 }),
             );
+            for (const node of head.hydraNodes) {
+                const nodeName = this.getDockerContainerName(node);
+                const container = await this.dockerService.getContainerByName(nodeName);
+                containers.push(container);
+            }
+            await this.dockerService.updateRedisActiveNodes(head, containers)
+            await this.waitForAllNodesReady(head.hydraNodes, TIMEOUT_NODE_READY_MS, POLL_INTERVAL_NODE_READY_MS);
+            this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, head.status));
         } catch (err) {
-            throw new BadRequestException(`Failed to restart one or more containers: ${err.message}`);
+            let headStatus: string = head.status;
+            for (const node of head.hydraNodes) {
+                const nodeName = this.getDockerContainerName(node);
+                const isRunning = await this.dockerService.checkContainerRunning(nodeName);
+                if (!isRunning) {
+                    head.status = 'stop';
+                    await this.hydraHeadRepository.save(head);
+                    break;
+                }
+            }
+            console.log('Running come here!!!');
+            this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, headStatus));
+            throw new BadRequestException(`Have error when restart Hydra Head ${id}: ${err.message}`);
         }
-        await this.waitForAllNodesReady(head.hydraNodes, TIMEOUT_NODE_READY_MS, POLL_INTERVAL_NODE_READY_MS);
 
         return {
             message: `Hydra Head ${id} containers have been restarted successfully.`,
         };
-    }
-
-    /**
-     * Update Redis cache by adding newly activated nodes
-     * Similar to updateHydraContainerStatus but only adds new nodes
-     */
-    public async updateRedisActiveNodes(head: HydraHead, containers: Docker.Container[]): Promise<void> {
-        try {
-            // Get current active nodes from Redis
-            const currentActiveNodes = (await this.cacheManager.get<Caching['activeNodes']>('activeNodes')) || [];
-
-            // Get container info for newly created containers
-            const newActiveNodes = await Promise.all(
-                containers.map(async container => {
-                    const containerInfo = await container.inspect();
-                    if (!containerInfo.State.Running) {
-                        throw new Error(`Container ${containerInfo.Name} is not running after activation.`);
-                    }
-                    return {
-                        hydraNodeId: containerInfo.Config.Labels[this.hydraConfig.hydraNodeLabel],
-                        hydraHeadId: containerInfo.Config.Labels[this.hydraConfig.hydraHeadLabel],
-                        container: containerInfo as unknown as Docker.ContainerInfo,
-                        isActive: containerInfo.State.Running,
-                    };
-                }),
-            );
-
-            // Filter out any nodes that already exist in cache (by hydraNodeId)
-            const existingNodeIds = currentActiveNodes.map(node => node.hydraNodeId);
-            const nodesToAdd = newActiveNodes.filter(node => !existingNodeIds.includes(node.hydraNodeId));
-
-            // Merge with existing active nodes
-            const updatedActiveNodes = [...currentActiveNodes, ...nodesToAdd];
-
-            // Update Redis cache
-            await this.cacheManager.set<Caching['activeNodes']>('activeNodes', updatedActiveNodes);
-
-            this.logger.log(
-                `Updated Redis cache: Added ${nodesToAdd.length} new active nodes for Head ${head.id}. ` +
-                    `Active nodes: ${updatedActiveNodes}`,
-            );
-        } catch (error: any) {
-            throw error;
-        }
     }
 }

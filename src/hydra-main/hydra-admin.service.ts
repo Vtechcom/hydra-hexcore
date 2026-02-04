@@ -26,6 +26,20 @@ export class HydraAdminService {
         };
     }
 
+    async loginPermanent(loginDto: AdminLoginDto) {
+        const user = await this.userRepository.findOne({ where: { username: loginDto.username } });
+        if (!user) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
+        if (user.password !== loginDto.password) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
+        const payload = { username: user.username, id: user.id, role: user.role };
+        return {
+            accessToken: await this.jwtService.signAsync(payload, { expiresIn: '20y' }),
+        };
+    }
+
     async auth(id: number) {
         const user = await this.userRepository.findOne({ where: { id } });
         if (!user) {

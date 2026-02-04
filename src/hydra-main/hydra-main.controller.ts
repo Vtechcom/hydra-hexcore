@@ -51,6 +51,13 @@ export class HydraMainController {
         return user;
     }
 
+    @ApiOperation({ summary: 'Login with long term access token' })
+    @Post('login-permanent')
+    async loginPermanent(@Body() loginDto: AdminLoginDto) {
+        const user = await this.hydraAdminService.loginPermanent(loginDto);
+        return user;
+    }
+
     @UseGuards(AdminAuthGuard)
     @UseInterceptors(ClassSerializerInterceptor)
     @Get('auth')
