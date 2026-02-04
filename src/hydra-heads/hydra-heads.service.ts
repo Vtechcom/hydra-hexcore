@@ -399,8 +399,8 @@ export class HydraHeadService {
                 };
             }
 
-            // Update Redis cache - add newly activated nodes
-            await this.dockerService.updateRedisActiveNodes(head, createdContainers);
+            // Update in-memory cache - add newly activated nodes
+            await this.dockerService.cacheActiveNodes(head, createdContainers);
 
             // Wait for all nodes to be ready (receive Greetings with headStatus: Idle)
             this.logger.log(`Waiting for all ${head.hydraNodes.length} nodes to be ready...`);
@@ -936,7 +936,7 @@ export class HydraHeadService {
                 const container = await this.dockerService.getContainerByName(nodeName);
                 containers.push(container);
             }
-            await this.dockerService.updateRedisActiveNodes(head, containers);
+            await this.dockerService.cacheActiveNodes(head, containers);
             await this.waitForAllNodesReady(head.hydraNodes, TIMEOUT_NODE_READY_MS, POLL_INTERVAL_NODE_READY_MS);
             this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, head.status));
         } catch (err) {

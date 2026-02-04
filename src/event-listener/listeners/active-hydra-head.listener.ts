@@ -14,10 +14,10 @@ export class ActiveHydraHeadListener {
     async handleActiveHydraHeadEvent(event: ActiveHydraHeadEvent) {
         this.logger.log(`Event is running - headId: ${event.headId}, status: ${event.status}`);
         try {
-            await this.hydraHubApiService.asyncHydraHead({ headId: event.headId, status: event.status });
-            this.logger.log(`Successfully sent async head status for headId: ${event.headId}`);
+            await this.hydraHubApiService.syncHydraHeadStatus({ headId: event.headId, status: event.status });
+            this.logger.log(`Successfully sent sync head status for headId: ${event.headId}`);
         } catch (error) {
-            this.logger.error(`Failed to send async head status for headId: ${event.headId}: ${error.message}`);
+            this.logger.error(`Failed to send sync head status for headId: ${event.headId}: ${error.message}`);
         }
     }
 }

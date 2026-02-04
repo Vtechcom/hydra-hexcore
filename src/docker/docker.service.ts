@@ -194,10 +194,11 @@ export class DockerService {
     }
 
     /**
-     * Update Redis cache by adding newly activated nodes
+     * Update cache by adding newly activated nodes
      * Similar to updateHydraContainerStatus but only adds new nodes
+     * User in-memory cache instead of Redis
      */
-    public async updateRedisActiveNodes(head: HydraHead, containers: Docker.Container[]): Promise<void> {
+    public async cacheActiveNodes(head: HydraHead, containers: Docker.Container[]): Promise<void> {
         try {
             // Get current active nodes from Redis
             const currentActiveNodes = (await this.cacheManager.get<Caching['activeNodes']>('activeNodes')) || [];
