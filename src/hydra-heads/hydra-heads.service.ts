@@ -67,7 +67,7 @@ export class HydraHeadService {
             newHydraHead.contestationPeriod = body.contestationPeriod?.toString();
             newHydraHead.depositPeriod = body.depositPeriod?.toString();
             newHydraHead.persistenceRotateAfter = body.persistenceRotateAfter?.toString();
-            newHydraHead.protocolParameters = body.protocolParameters;
+            newHydraHead.protocolParameters = body.protocolParams;
             newHydraHead.nodes = body.hydraHeadKeys.length;
             const account = await this.accountRepository.findOne({
                 where: { id: 1 },
