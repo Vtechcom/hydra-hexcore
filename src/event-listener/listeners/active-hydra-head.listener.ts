@@ -1,4 +1,4 @@
-import { HydraHubApiService } from 'src/hub-service/hydrahub-api.service';
+import { HydraHubApiService } from 'src/hydra-hub/hydrahub-api.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventEnum } from '../enums/event.enum';
 import { ActiveHydraHeadEvent } from '../events/active-hydra-head.event';
@@ -14,10 +14,10 @@ export class ActiveHydraHeadListener {
     async handleActiveHydraHeadEvent(event: ActiveHydraHeadEvent) {
         this.logger.log(`Event is running - headId: ${event.headId}, status: ${event.status}`);
         try {
-            await this.hydraHubApiService.asyncHydraHead({ headId: event.headId, status: event.status });
-            this.logger.log(`Successfully sent async head status for headId: ${event.headId}`);
+            await this.hydraHubApiService.syncHydraHeadStatus({ headId: event.headId, status: event.status });
+            this.logger.log(`Successfully sent sync head status for headId: ${event.headId}`);
         } catch (error) {
-            this.logger.error(`Failed to send async head status for headId: ${event.headId}: ${error.message}`);
+            this.logger.error(`Failed to send sync head status for headId: ${event.headId}: ${error.message}`);
         }
     }
 }

@@ -1,4 +1,4 @@
-import { IPaginationOptions } from 'src/interfaces/pagination.type';
+import { IPaginationOptions } from 'src/common/interfaces/pagination.type';
 import { InfinityPaginationResponseDto } from './dto/infinity-pagination-response.dto';
 
 export const infinityPagination = <T>(data: T[], options: IPaginationOptions): InfinityPaginationResponseDto<T> => {

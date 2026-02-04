@@ -42,7 +42,7 @@ export class HydraHubApiService extends BaseApiService implements OnModuleInit {
         };
     }
 
-    async asyncHydraHead(body: { headId: number, status: string }, config?: AxiosRequestConfig) {
+    async syncHydraHeadStatus(body: { headId: number; status: string }, config?: AxiosRequestConfig) {
         const url = this.buildUrl(`/hydra-heads/webhook/async-head-status`);
         const requestConfig = this.buildConfig(config);
         return this.post<any>(url, body, requestConfig);

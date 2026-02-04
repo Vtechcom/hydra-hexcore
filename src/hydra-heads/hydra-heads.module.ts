@@ -7,7 +7,7 @@ import { HydraHeadController } from './hydra-heads.controller';
 import { Account } from 'src/hydra-main/entities/Account.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { OgmiosClientService } from 'src/hydra-main/ogmios-client.service';
-import { jwtConstants } from 'src/constants';
+import { jwtConstants } from 'src/common/constants';
 import { DockerModule } from 'src/docker/docker.module';
 import { HydraConfig } from 'src/config/hydra.config';
 import { AxiosModule } from 'src/axios';

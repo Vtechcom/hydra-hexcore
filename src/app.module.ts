@@ -2,13 +2,12 @@ import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HydraMainModule } from './hydra-main/hydra-main.module';
-import { ShellModule } from './shell/shell.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import configuration from './config/configuration';
 import { CacheModule } from '@nestjs/cache-manager';
-import { createKeyv, Keyv } from '@keyv/redis';
+import { Keyv } from '@keyv/redis';
 import { CacheableMemory } from 'cacheable';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './config/winston.config';
@@ -31,22 +30,18 @@ import { EventListenerModule } from './event-listener/event-listener.module';
         }),
         CacheModule.registerAsync({
             isGlobal: true,
-            useFactory: async () => {
-                return {
-                    stores: [
-                        new Keyv({
-                            store: new CacheableMemory({ ttl: 60000, lruSize: 5000 }),
+            useFactory: async () => ({
+                stores: [
+                    new Keyv({
+                        store: new CacheableMemory({
+                            ttl: 60_000, // 60s
+                            lruSize: 5_000,
                         }),
-                        createKeyv({
-                            url: configuration().redis.url,
-                            password: configuration().redis.password,
-                        }),
-                    ],
-                };
-            },
+                    }),
+                ],
+            }),
         }),
         HydraMainModule,
-        ShellModule,
         HydraHeadsModule,
         EventListenerModule,
         TypeOrmModule.forRootAsync({

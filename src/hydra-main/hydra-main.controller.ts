@@ -15,14 +15,14 @@ import { HydraMainService } from './hydra-main.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { validateMnemonic } from 'bip39';
 import { QueryHydraDto } from './dto/query-hydra.dto';
-import { infinityPagination } from 'src/utils/infinity-pagination';
-import { InfinityPaginationResponseDto } from 'src/utils/dto/infinity-pagination-response.dto';
+import { infinityPagination } from 'src/common/utils/infinity-pagination';
 import { HydraDto } from './dto/hydra.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { HydraAdminService } from './hydra-admin.service';
 import { AdminAuthGuard } from 'src/auth/admin-auth.guard';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AddressUtxoDto } from './dto/response/address-utxo.dto';
+import { InfinityPaginationResponseDto } from 'src/common/utils/dto/infinity-pagination-response.dto';
 
 @ApiTags('Hydra Main Service')
 @Controller('hydra-main')
