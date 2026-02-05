@@ -613,7 +613,7 @@ export class HydraHeadService {
 
     /**
      * Check if a single Hydra node is ready by connecting to its WebSocket API
-     * and waiting for a Greetings message with headStatus: "Idle"
+     * and waiting for a Greetings message (any headStatus: Idle, Open, Initializing, etc.)
      * @param port - The API port of the Hydra node
      * @param timeoutMs - Maximum time to wait for the node to be ready (default: 60000ms)
      * @returns Promise<boolean> - True if the node is ready, false otherwise
@@ -664,8 +664,10 @@ export class HydraHeadService {
                 ws.on('message', (data: Buffer) => {
                     try {
                         const message = JSON.parse(data.toString());
-                        if (message.tag === 'Greetings' && message.headStatus === 'Idle') {
-                            this.logger.log(`Node at port ${port} is ready (headStatus: Idle)`);
+                        // Accept any Greetings message - node is ready regardless of headStatus
+                        // Valid headStatus values: Idle, Initializing, Open, Closed, Final
+                        if (message.tag === 'Greetings') {
+                            this.logger.log(`Node at port ${port} is ready (headStatus: ${message.headStatus})`);
                             resolveOnce(true);
                         }
                     } catch (e) {
