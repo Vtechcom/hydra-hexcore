@@ -235,18 +235,18 @@ export class HydraHeadService {
         // if (head.status === 'ACTIVE') {
         //     throw new BadRequestException('Head is already active');
         // }
-        for (const node of head.hydraNodes) {
-            const enterpriseAddress = getEnterpriseAddressFromKeys(
-                node.cardanoSKey as `5820${string}`,
-                node.cardanoVKey as `5820${string}`,
-                0,
-            );
-            const check = await this.checkUtxoAccount(enterpriseAddress);
-            if (!check) {
-                this.logger.error(enterpriseAddress + ' not enough lovelace');
-                throw new BadRequestException(enterpriseAddress + ' not enough lovelace');
-            }
-        }
+        // for (const node of head.hydraNodes) {
+        //     const enterpriseAddress = getEnterpriseAddressFromKeys(
+        //         node.cardanoSKey as `5820${string}`,
+        //         node.cardanoVKey as `5820${string}`,
+        //         0,
+        //     );
+        //     const check = await this.checkUtxoAccount(enterpriseAddress);
+        //     if (!check) {
+        //         this.logger.error(enterpriseAddress + ' not enough lovelace');
+        //         throw new BadRequestException(enterpriseAddress + ' not enough lovelace');
+        //     }
+        // }
         const headDirPath = resolveHeadDirPath(head.id, this.hydraConfig.hydraNodeFolder);
 
         let protocolParameters: any;
