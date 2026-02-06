@@ -33,6 +33,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventEnum } from 'src/event-listener/enums/event.enum';
 import { ActiveHydraHeadEvent } from 'src/event-listener/events/active-hydra-head.event';
+import { Cron } from '@nestjs/schedule';
 
 const TIMEOUT_NODE_READY_MS = 120000;
 const POLL_INTERVAL_NODE_READY_MS = 2000;
@@ -124,7 +125,7 @@ export class HydraHeadService {
                 ...newHydraHead,
                 nodes,
             };
-        } catch (error) {
+        } catch (error: any) {
             await queryRunner.rollbackTransaction();
             this.logger.error(`Error while creating hydra head: ${error.message}`);
             throw error;
@@ -411,7 +412,17 @@ export class HydraHeadService {
             head.status = 'running';
             await this.hydraHeadRepository.save(head);
 
-            this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, head.status));
+            this.eventEmitter.emit(
+                EventEnum.ACTIVE_HYDRA_HEAD,
+                new ActiveHydraHeadEvent(
+                    head.id,
+                    head.status,
+                    head.hydraNodes.map(node => ({
+                        ...node,
+                        status: 'running',
+                    })),
+                ),
+            );
         } catch (error: any) {
             // If any container fails, cleanup all created containers
             this.logger.error(`Error activating head ${head.id}: ${error.message}`);
@@ -420,14 +431,24 @@ export class HydraHeadService {
             for (const container of createdContainers) {
                 try {
                     await this.dockerService.cleanupContainer(container);
-                } catch (cleanupError) {
+                } catch (cleanupError: any) {
                     this.logger.error(`Error during cleanup: ${cleanupError.message}`);
                 }
             }
 
             head.status = 'stop';
             await this.hydraHeadRepository.save(head);
-            this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, head.status));
+            this.eventEmitter.emit(
+                EventEnum.ACTIVE_HYDRA_HEAD,
+                new ActiveHydraHeadEvent(
+                    head.id,
+                    head.status,
+                    head.hydraNodes.map(node => ({
+                        ...node,
+                        status: 'stop',
+                    })),
+                ),
+            );
 
             throw new BadRequestException(`Failed to activate head: ${error.message}`);
         }
@@ -826,7 +847,7 @@ export class HydraHeadService {
                         await access(persistenceDir, constants.R_OK | constants.W_OK);
                         await rm(persistenceDir, { recursive: true, force: true });
                         removedDirs.push(persistenceDir);
-                    } catch (error) {
+                    } catch (error: any) {
                         errors.push(error.message);
                     }
                 }
@@ -859,7 +880,7 @@ export class HydraHeadService {
             const nodeName = this.getDockerContainerName(node);
             try {
                 await this.dockerService.removeContainerByName(nodeName);
-            } catch (err) {
+            } catch (err: any) {
                 throw new BadRequestException(`Failed to remove container ${nodeName}: ${err.message}`);
             }
         }
@@ -870,7 +891,7 @@ export class HydraHeadService {
             await access(headDirPath, constants.R_OK | constants.W_OK);
             await rm(headDirPath, { recursive: true, force: true });
             console.log(`Removed head directory: ${headDirPath}`);
-        } catch (error) {
+        } catch (error: any) {
             console.log(`Error removing head directory: ${error.message}`);
         }
 
@@ -941,7 +962,7 @@ export class HydraHeadService {
             await this.dockerService.cacheActiveNodes(head, containers);
             await this.waitForAllNodesReady(head.hydraNodes, TIMEOUT_NODE_READY_MS, POLL_INTERVAL_NODE_READY_MS);
             this.eventEmitter.emit(EventEnum.ACTIVE_HYDRA_HEAD, new ActiveHydraHeadEvent(head.id, head.status));
-        } catch (err) {
+        } catch (err: any) {
             let headStatus: string = head.status;
             for (const node of head.hydraNodes) {
                 const nodeName = this.getDockerContainerName(node);
@@ -960,5 +981,63 @@ export class HydraHeadService {
         return {
             message: `Hydra Head ${id} containers have been restarted successfully.`,
         };
+    }
+
+    /**
+     * Cron job chạy mỗi 10 giây để kiểm tra trạng thái các node
+     * Nếu head trong DB có status "running" nhưng container đã chết thì sync với Hub
+     */
+    @Cron('*/10 * * * * *')
+    async checkNodeHealth(): Promise<void> {
+        try {
+            this.logger.log('Running health check for Hydra Heads...');
+            // Get all running heads in DB
+            const runningHeads = await this.hydraHeadRepository.find({
+                where: { status: 'running' },
+                relations: ['hydraNodes'],
+            });
+
+            if (runningHeads.length === 0) {
+                return;
+            }
+            let nodes: HydraNode[] = [];
+
+            for (const head of runningHeads) {
+                const headNodes = head.hydraNodes || [];
+                if (headNodes.length === 0) continue;
+
+                // Kiểm tra xem có node nào bị chết không
+                for (const node of headNodes) {
+                    const containerName = this.getDockerContainerName(node);
+                    const isRunning = await this.dockerService.checkContainerRunning(containerName);
+
+                    if (!isRunning) nodes.push({ ...node, status: 'stop' } as HydraNode);
+                }
+                try {
+                    if (nodes.length > 0) {
+                        // Cập nhật DB
+                        await this.hydraHeadRepository.update(head.id, { status: 'stop' });
+                        // Sync với Hub
+                        await this.eventEmitter.emitAsync(
+                            EventEnum.ACTIVE_HYDRA_HEAD,
+                            new ActiveHydraHeadEvent(
+                                head.id,
+                                'stop',
+                                nodes.map(node => ({
+                                    ...node,
+                                    status: 'stop',
+                                })),
+                            ),
+                        );
+                        this.logger.log(`Synced Head ${head.id} status "stop" with Hub`);
+                    }
+                } catch (err: any) {
+                    this.logger.error(`Failed to sync Head ${head.id} with Hub: ${err.message}`);
+                }
+            }
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Health check error: ${errorMsg}`);
+        }
     }
 }

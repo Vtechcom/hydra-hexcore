@@ -12,6 +12,7 @@ import { DockerModule } from 'src/docker/docker.module';
 import { HydraConfig } from 'src/config/hydra.config';
 import { AxiosModule } from 'src/axios';
 import { BlockFrostApiService } from 'src/blockfrost/blockfrost-api.service';
+import { HydraHubApiService } from 'src/hydra-hub/hydrahub-api.service';
 
 @Module({
     imports: [
@@ -23,7 +24,7 @@ import { BlockFrostApiService } from 'src/blockfrost/blockfrost-api.service';
         DockerModule,
         AxiosModule,
     ],
-    providers: [HydraHeadService, OgmiosClientService, HydraConfig, BlockFrostApiService],
+    providers: [HydraHeadService, OgmiosClientService, HydraConfig, BlockFrostApiService, HydraHubApiService],
     controllers: [HydraHeadController],
     exports: [HydraHeadService, HydraConfig],
 })
