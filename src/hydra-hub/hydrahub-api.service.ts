@@ -4,6 +4,7 @@ import { AxiosRequestConfig } from 'axios';
 import { BaseApiService } from 'src/axios';
 import { OnModuleInit } from '@nestjs/common';
 import { Injectable } from '@nestjs/common';
+import { HydraNode } from 'src/hydra-main/entities/HydraNode.entity';
 
 @Injectable()
 export class HydraHubApiService extends BaseApiService implements OnModuleInit {
@@ -42,7 +43,7 @@ export class HydraHubApiService extends BaseApiService implements OnModuleInit {
         };
     }
 
-    async syncHydraHeadStatus(body: { headId: number; status: string }, config?: AxiosRequestConfig) {
+    async syncHydraHeadStatus(body: { headId: number, status: string, nodes?: HydraNode[] }, config?: AxiosRequestConfig) {
         const url = this.buildUrl(`/hydra-heads/webhook/async-head-status`);
         const requestConfig = this.buildConfig(config);
         return this.post<any>(url, body, requestConfig);
