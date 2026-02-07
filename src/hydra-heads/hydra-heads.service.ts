@@ -1000,21 +1000,26 @@ export class HydraHeadService {
             if (runningHeads.length === 0) {
                 return;
             }
-            let nodes: HydraNode[] = [];
 
             for (const head of runningHeads) {
                 const headNodes = head.hydraNodes || [];
                 if (headNodes.length === 0) continue;
+
+                // FIXED: Reset nodes array PER HEAD (was previously shared across all heads)
+                const stoppedNodes: HydraNode[] = [];
 
                 // Kiểm tra xem có node nào bị chết không
                 for (const node of headNodes) {
                     const containerName = this.getDockerContainerName(node);
                     const isRunning = await this.dockerService.checkContainerRunning(containerName);
 
-                    if (!isRunning) nodes.push({ ...node, status: 'stop' } as HydraNode);
+                    if (!isRunning) stoppedNodes.push({ ...node, status: 'stop' } as HydraNode);
                 }
                 try {
-                    if (nodes.length > 0) {
+                    if (stoppedNodes.length > 0) {
+                        this.logger.warn(
+                            `Head ${head.id}: ${stoppedNodes.length}/${headNodes.length} nodes stopped`,
+                        );
                         // Cập nhật DB
                         await this.hydraHeadRepository.update(head.id, { status: 'stop' });
                         // Sync với Hub
@@ -1023,7 +1028,7 @@ export class HydraHeadService {
                             new ActiveHydraHeadEvent(
                                 head.id,
                                 'stop',
-                                nodes.map(node => ({
+                                stoppedNodes.map(node => ({
                                     ...node,
                                     status: 'stop',
                                 })),
