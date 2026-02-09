@@ -13,7 +13,7 @@
 ### Test Environment
 - 🗄️ Database: MySQL 8.0
 - 🔧 Node.js: 22.16.0
-- 📋 [Actions Run](https://github.com/Vtechcom/hydra-hexcore/actions/runs/21821409950)
+- 📋 [Actions Run](https://github.com/Vtechcom/hydra-hexcore/actions/runs/21821420819)
 </details>
 
 ---
