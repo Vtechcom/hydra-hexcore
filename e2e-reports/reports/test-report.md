@@ -1,19 +1,19 @@
-## ❌ E2E Tests Results
+## ✅ E2E Tests Results
 
-**Tests:** 59/60 passed | **Status:** 1 test(s) failed
+**Tests:** 60/60 passed | **Status:** All tests passed
 
 <details>
 <summary>📊 View Details</summary>
 
 ### Test Breakdown
-- ✅ Passed: 59
-- ❌ Failed: 1
+- ✅ Passed: 60
+- ❌ Failed: 0
 - 📊 Total: 60
 
 ### Test Environment
 - 🗄️ Database: MySQL 8.0
 - 🔧 Node.js: 22.16.0
-- 📋 [Actions Run](https://github.com/Vtechcom/hydra-hexcore/actions/runs/20291672014)
+- 📋 [Actions Run](https://github.com/Vtechcom/hydra-hexcore/actions/runs/21821409950)
 </details>
 
 ---
