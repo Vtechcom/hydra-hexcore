@@ -14,7 +14,7 @@ export const HydraConfig = {
         hydraNodeImage: config.get<string>('NEST_HYDRA_NODE_IMAGE'),
         hydraNodeFolder: config.get<string>('NEST_HYDRA_NODE_FOLDER'),
         hydraNodeScriptTxId: config.get<string>('NEST_HYDRA_NODE_SCRIPT_TX_ID'),
-        hydraNodeNetworkId: config.get<string>('NEST_HYDRA_NODE_NETWORK_ID'),
+        hydraNodeNetworkId: config.get<string>('NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID'),
 
         cardanoAccountMinLovelace: Number(config.get('ACCOUNT_MIN_LOVELACE', 50000000)),
 

@@ -7,13 +7,12 @@ Dự án hỗ trợ **2 chế độ kết nối** vào mạng Cardano:
 | **Độ khó**      | ⭐ Dễ — chỉ cần API key          | ⭐⭐⭐ Khó — phải tự chạy full node          |
 | **Yêu cầu**     | Tài khoản Blockfrost             | Đã chạy thành công cardano-node              |
 | **Ưu điểm**     | Nhanh, không cần sync blockchain | Không phụ thuộc bên thứ 3, chạy offline được |
-| **Khuyến nghị** | Phù hợp dev/test nhanh           | Phù hợp production                           |
 
 > Chọn **một trong hai** chế độ và làm theo hướng dẫn tương ứng bên dưới.
 
 ---
 
-# Phần A — Chạy bằng Blockfrost (Khuyến nghị cho Development)
+# Phần A — Chạy bằng Blockfrost
 
 ## Yêu cầu hệ thống
 
@@ -21,7 +20,6 @@ Dự án hỗ trợ **2 chế độ kết nối** vào mạng Cardano:
 - **pnpm** (khuyến nghị) — cài đặt: `npm install -g pnpm`
 - **Docker** & **Docker Compose**
 - **MySQL** 8.0+
-- **Redis** 7.0+
 - Tài khoản **Blockfrost** (lấy API key tại [https://blockfrost.io](https://blockfrost.io))
 
 ---
@@ -57,9 +55,6 @@ BLOCKFROST_PROJECT_ID=preprodXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 # Base URL cho Blockfrost API (preprod / mainnet)
 BLOCKFROST_API_BASE_URL=https://cardano-preprod.blockfrost.io/api/v0
-
-# 0: testnet/preprod, 1: mainnet
-CARDANO_NETWORK_ID=0
 ```
 
 > **Lưu ý:** Đăng ký tài khoản Blockfrost miễn phí tại [blockfrost.io](https://blockfrost.io), tạo project trên mạng **Preprod** và lấy **Project ID**.
@@ -67,9 +62,14 @@ CARDANO_NETWORK_ID=0
 ### 2.2. Cấu hình Hydra Node
 
 ```dotenv
+# testnet hoặc mainnet
+# Nếu là testnet → hệ thống sẽ dùng --testnet-magic <NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID>
+# Nếu là mainnet → hệ thống sẽ dùng --mainnet (bỏ qua NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID)
+CARDANO_NETWORK='testnet'
+
 NEST_HYDRA_NODE_IMAGE='ghcr.io/cardano-scaling/hydra-node:1.2.0'
 NEST_HYDRA_NODE_SCRIPT_TX_ID='ba97aaa648271c75604e66e3a4e00da49bdcaca9ba74d9031ab4c08f736e1c12,ff046eba10b9b0f90683bf5becbd6afa496059fc1cf610e798cfe778d85b70ba,4bb8c01290599cc9de195b586ee1eb73422b00198126f51f52b00a8e35da9ce3'
-NEST_HYDRA_NODE_NETWORK_ID='1'
+NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID='1'
 NEST_HYDRA_NODE_FOLDER='/path/to/hydra/preprod'
 ```
 
@@ -156,24 +156,23 @@ Dưới đây là bảng Script TX IDs cho một số phiên bản phổ biến:
 
 > **Quan trọng:** Script TX IDs **phải khớp** với phiên bản Docker Image (`NEST_HYDRA_NODE_IMAGE`). Nếu dùng image `1.2.0` thì phải dùng TX IDs của phiên bản `1.2.0`.
 
-#### Cách chọn `NEST_HYDRA_NODE_NETWORK_ID`
+#### Cách chọn `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`
 
-Giá trị này là **Cardano Network Magic Number**, khác với `CARDANO_NETWORK_ID`:
+| Mạng                  | `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID` |
+| --------------------- | --------------------------------------- |
+| **Preview** (testnet) | `2`                                     |
+| **Preprod** (testnet) | `1`                                     |
+| **Mainnet**           | Không cần (dùng `CARDANO_NETWORK='mainnet'`) |
 
-| Mạng                  | `NEST_HYDRA_NODE_NETWORK_ID` | `CARDANO_NETWORK_ID` |
-| --------------------- | ---------------------------- | -------------------- |
-| **Preview** (testnet) | `2`                          | `0`                  |
-| **Preprod** (testnet) | `1`                          | `0`                  |
-| **Mainnet**           | `764824073`                  | `1`                  |
+> **Lưu ý:** Khi `CARDANO_NETWORK='mainnet'`, hệ thống tự động dùng `--mainnet` và **bỏ qua** `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`.
 
-Ví dụ cấu hình cho **Preprod** (phổ biến nhất cho development):
+Ví dụ cấu hình cho **Preprod**:
 
 ```dotenv
 NEST_HYDRA_NODE_IMAGE='ghcr.io/cardano-scaling/hydra-node:1.2.0'
 NEST_HYDRA_NODE_SCRIPT_TX_ID='ba97aaa648271c75604e66e3a4e00da49bdcaca9ba74d9031ab4c08f736e1c12,ff046eba10b9b0f90683bf5becbd6afa496059fc1cf610e798cfe778d85b70ba,4bb8c01290599cc9de195b586ee1eb73422b00198126f51f52b00a8e35da9ce3'
-NEST_HYDRA_NODE_NETWORK_ID='1'
+NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID='1'
 NEST_HYDRA_NODE_FOLDER='/path/to/hydra/preprod'
-CARDANO_NETWORK_ID=0
 ```
 
 #### Bảng tương thích phiên bản
@@ -211,12 +210,21 @@ NEST_DOCKER_ENABLE_NETWORK_HOST='false'
 ### 2.5. Cấu hình JWT & Hydra Hub
 
 ```dotenv
+# Secret key phục vụ cho tạo accessToken phục vụ cho việc xác thực
 JWT_SECRET=your_jwt_secret_key
+# Các thông tin dưới cần liên hệ với bên Hub để được cấp thông tin
 HYDRA_HUB_API_BASE_URL=https://api.hydrahub.io
 HUB_API_KEY=your_hub_api_key
 ```
 
-### 2.6. Port & Log
+### 2.6. Giới hạn & Cấu hình khác
+
+```dotenv
+# Số lượng node tối đa có thể active cùng lúc
+MAX_ACTIVE_NODES=20
+```
+
+### 2.7. Port & Log
 
 ```dotenv
 PORT=3010
@@ -230,17 +238,16 @@ LOG_DIR=logs
 Dự án đã cung cấp sẵn file Docker Compose cho MySQL:
 
 ```bash
-cd configs/mysql-databases-redis
+cd configs/mysql-databases
 docker compose up -d
-cd ../..
+cd ../..  
 ```
 
 Sau khi khởi chạy:
 
-| Service    | Host      | Port | Username     | Password         |
-| ---------- | --------- | ---- | ------------ | ---------------- |
-| MySQL      | localhost | 3327 | hexcore_user | hexcore_password |
-| MySQL Test | localhost | 3328 | hexcore_user | hexcore_password |
+| Service | Host      | Port | Username     | Password         |
+| ------- | --------- | ---- | ------------ | ---------------- |
+| MySQL   | localhost | 3327 | hexcore_user | hexcore_password |
 
 > Cập nhật file `.env` cho đúng port nếu dùng Docker Compose mặc định:
 >
@@ -259,11 +266,11 @@ Sau khi khởi chạy:
 # Tạo thư mục logs nếu chưa có
 mkdir -p logs
 
-# Tạo thư mục lưu trữ Hydra Node data
-mkdir -p /path/to/hydra/preprod
+# Tạo thư mục lưu trữ Hydra Node data (Nó là thư mục để lưu persistence và các key sử dụng trong hydra node)
+mkdir -p /path/to/hydra/.../
 
 # Phân quyền cho thư mục Hydra Node
-chmod -R 755 /path/to/hydra/preprod
+chmod -R 755 /path/to/hydra/.../
 
 # Phân quyền cho thư mục logs
 chmod -R 755 logs
@@ -273,14 +280,17 @@ chmod -R 755 logs
 sudo usermod -aG docker $USER
 ```
 
-> **Quan trọng:** Thay `/path/to/hydra/preprod` bằng đường dẫn thực tế bạn đã cấu hình trong `NEST_HYDRA_NODE_FOLDER` ở file `.env`.
+> **Quan trọng:** Thay `/path/to/hydra/.../` bằng đường dẫn thực tế bạn đã cấu hình trong `NEST_HYDRA_NODE_FOLDER` ở file `.env`.
 
 ---
 
-## 5. Chạy dự án (Development)
-
+## 5. Chạy dự án
 ```bash
-pnpm start:dev
+# Build production
+pnpm build
+
+# Chạy production
+pnpm start:prod
 ```
 
 Server sẽ khởi chạy tại:
@@ -288,24 +298,12 @@ Server sẽ khởi chạy tại:
 - **API:** `http://localhost:3010`
 - **Swagger docs:** `http://localhost:3010/api-docs`
 
-Các lệnh chạy khác:
-
-```bash
-# Build production
-pnpm build
-
-# Chạy production
-pnpm start:prod
-
-# Chạy debug mode
-pnpm start:debug
-```
 
 ---
 
 ## 6. Tạo tài khoản Admin & Đăng ký Provider
 
-Sau khi server chạy thành công và database đã được sync, chạy seed để tạo tài khoản admin:
+Sau khi server chạy thành công và database đã được sync, chạy lệnh sau để tại tài khoản admin và đăng ký provider:
 
 ```bash
 pnpm seed:run --path=src/migrations/seeders/create-account-admin.seeder.ts --username=admin --password=your_password
@@ -316,7 +314,7 @@ pnpm seed:run --path=src/migrations/seeders/create-account-admin.seeder.ts --use
 - `--username=admin` — tên đăng nhập cho tài khoản admin
 - `--password=your_password` — mật khẩu cho tài khoản admin (thay bằng mật khẩu mạnh)
 
-Khi chạy thành công, seeder sẽ:
+Khi chạy thành công, sẽ:
 
 1. Tạo tài khoản admin trong database
 2. Tự động đăng nhập và lấy **Access Token**
@@ -326,16 +324,22 @@ Output mẫu:
 
 ```
 Starting create account admin seeder...
+  ✓ Admin account created with username: admin, password: ****
 Access token: eyJhbGciOi...
-  ✓ Created admin account with username: admin
-Seeder finished successfully.
+ID: 1
+Code: PRV-XXXX
+Name: Provider Name
+Is Verified: false
+Network: preprod
+Webhook Key: whk_XXXX...
+Process finished successfully.
 ```
 
-> **Lưu ý:** Seeder sẽ xóa toàn bộ user cũ trước khi tạo admin mới. Đảm bảo đã cấu hình `HYDRA_HUB_API_BASE_URL` và `HUB_API_KEY` trong `.env` để việc đăng ký provider lên Hub thành công.
+> **Lưu ý:** Seeder sẽ xóa toàn bộ user cũ trước khi tạo admin mới. Đảm bảo đã cấu hình `HYDRA_HUB_API_BASE_URL` và `HUB_API_KEY` trong `.env` để việc đăng ký provider lên Hub thành công. (Liên hệ với bên quản lý Hub để được cấp thông tin của `HYDRA_HUB_API_BASE_URL` và `HUB_API_KEY`)
 
 ---
 
-## 7. Sử dụng API
+## 7. Sử dụng API (Lựa chọn này có thể thực hiện hoặc không)
 
 Sau khi tạo tài khoản admin, bạn có thể:
 
@@ -356,14 +360,15 @@ cp .env.example .env
 # Sửa .env theo hướng dẫn ở trên
 
 # 3. Khởi chạy database
-cd configs/mysql-databases-redis && docker compose up -d && cd ../..
+cd configs/mysql-databases && docker compose up -d && cd ../..
 
 # 4. Phân quyền
 mkdir -p logs
 chmod -R 755 logs
 
 # 5. Chạy project
-pnpm start:dev
+pnpm build
+pnpm start:prod
 
 # 6. Tạo admin & đăng ký provider (terminal khác)
 pnpm seed:run --path=src/migrations/seeders/create-account-admin.seeder.ts --username=admin --password=your_password
@@ -376,7 +381,7 @@ pnpm seed:run --path=src/migrations/seeders/create-account-admin.seeder.ts --use
 | Lỗi                                                          | Nguyên nhân                                        | Cách khắc phục                                                                |
 | ------------------------------------------------------------ | -------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `BlockFrost API configuration is missing`                    | Chưa cấu hình Blockfrost                           | Kiểm tra `BLOCKFROST_PROJECT_ID` trong `.env`                                 |
-| `ECONNREFUSED 127.0.0.1:3309`                                | MySQL chưa chạy                                    | Chạy `docker compose up -d` trong `configs/mysql-databases-redis`             |
+| `ECONNREFUSED 127.0.0.1:3309`                                | MySQL chưa chạy                                    | Chạy `docker compose up -d` trong `configs/mysql-databases`             |
 | `EACCES: permission denied`                                  | Không có quyền ghi thư mục                         | Chạy `chmod -R 755` cho thư mục tương ứng                                     |
 | `connect ENOENT /var/run/docker.sock`                        | Docker daemon chưa chạy                            | Khởi động Docker service                                                      |
 | `connect ENOENT .../node.socket`                             | Cardano Node chưa chạy hoặc chưa phân quyền socket | Kiểm tra cardano-node container đang chạy, chạy `chmod 777 node.socket`       |
@@ -400,23 +405,7 @@ pnpm install
 ```
 
 ## B2. Chạy Cardano Node
-
-Dự án cung cấp sẵn Docker Compose cho cardano-node tại `configs/cardano/docker-compose.yml`:
-
-```bash
-cd configs/cardano
-docker compose up -d
-cd ../..
-```
-
-Docker Compose mặc định:
-
-- **Image:** `ghcr.io/intersectmbo/cardano-node:10.2.1`
-- **Container name:** `cardano-node`
-- Mount thư mục `configs/cardano/` → `/workspace` trong container
-- File socket: `/workspace/node.socket` (trong container)
-
-Hoặc nếu bạn đã có cardano-node đang chạy ở nơi khác, bỏ qua bước này — chỉ cần biết:
+Cardano Node:
 
 - **Tên container** (hoặc cách truy cập `cardano-cli`)
 - **Đường dẫn thư mục** chứa `node.socket`, `shelley-genesis.json` trên máy host
@@ -473,8 +462,10 @@ Chỉnh sửa các biến sau:
 ```dotenv
 CARDANO_CONNECTION_MODE=cardano-node
 
-# 0: testnet/preprod, 1: mainnet
-CARDANO_NETWORK_ID=0
+# testnet hoặc mainnet
+# Nếu là testnet → hệ thống sẽ dùng --testnet-magic <NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID>
+# Nếu là mainnet → hệ thống sẽ dùng --mainnet (bỏ qua NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID)
+CARDANO_NETWORK='testnet'
 ```
 
 ### Cấu hình Cardano Node
@@ -502,7 +493,7 @@ Xem hướng dẫn chi tiết cách lấy Script TX ID, Network ID ở [mục 2.
 ```dotenv
 NEST_HYDRA_NODE_IMAGE='ghcr.io/cardano-scaling/hydra-node:1.2.0'
 NEST_HYDRA_NODE_SCRIPT_TX_ID='ba97aaa648271c75604e66e3a4e00da49bdcaca9ba74d9031ab4c08f736e1c12,ff046eba10b9b0f90683bf5becbd6afa496059fc1cf610e798cfe778d85b70ba,4bb8c01290599cc9de195b586ee1eb73422b00198126f51f52b00a8e35da9ce3'
-NEST_HYDRA_NODE_NETWORK_ID='1'
+NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID='1'
 NEST_HYDRA_NODE_FOLDER='/home/user/hydra-hexcore/hydra/preprod'
 ```
 
@@ -519,9 +510,15 @@ DB_SYNCHRONIZE=true
 NEST_DOCKER_SOCKET_PATH='/var/run/docker.sock'
 NEST_DOCKER_ENABLE_NETWORK_HOST='false'
 
-JWT_SECRET=your_jwt_secret_key
-HYDRA_HUB_API_BASE_URL=https://api.hydrahub.io
-HUB_API_KEY=your_hub_api_key
+JWT_SECRET=your_jwt_secret_key #(Khóa bí mật để tạo accessToken phục vụ cho việc xác thực)
+HYDRA_HUB_API_BASE_URL=https://api.hydrahub.io #(Liên hệ với Hub để có thể cấp thông tin)
+HUB_API_KEY=your_hub_api_key #(Liên hệ với Hub để có thể cấp thông tin)
+
+ACCOUNT_MIN_LOVELACE=50000000
+MAX_ACTIVE_NODES=20
+
+NEST_OGMIOS_HOST=localhost
+NEST_OGMIOS_PORT=1337
 
 PORT=3010
 LOG_DIR=logs
@@ -547,7 +544,7 @@ Trong đó:
 
 - `cardano-node` — tên container (= `NEST_CARDANO_NODE_SERVICE_NAME`)
 - `/workspace/node.socket` — đường dẫn socket **bên trong container cardano-node** (được mount từ `configs/cardano/` → `/workspace/` theo docker-compose)
-- `--testnet-magic 1` — Network Magic Number (= `NEST_HYDRA_NODE_NETWORK_ID`: 1 = Preprod, 2 = Preview)
+- `--testnet-magic 1` — Network Magic Number (= `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`: 1 = Preprod, 2 = Preview). Nếu `CARDANO_NETWORK='mainnet'`, hệ thống sẽ dùng `--mainnet` thay thế.
 
 > Nếu bạn chạy cardano-node của riêng mình (không dùng docker-compose mặc định), cần đảm bảo đường dẫn socket và tên container trong source code khớp với cấu hình của bạn. Hiện tại các giá trị này đang hardcode trong source (xem `hydra-heads.service.ts` dòng 256-271).
 
@@ -581,7 +578,7 @@ Vì vậy:
 ## B6. Khởi chạy MySQL
 
 ```bash
-cd configs/mysql-databases-redis
+cd configs/mysql-databases
 docker compose up -d
 cd ../..
 ```
@@ -592,7 +589,7 @@ cd ../..
 mkdir -p logs
 chmod -R 755 logs
 
-# Tạo thư mục Hydra data
+# Tạo thư mục Hydra data (Thư mục lưu thông tin persistence và key sử dụng trong hydra node)
 mkdir -p /home/user/hydra-hexcore/hydra/preprod
 chmod -R 755 /home/user/hydra-hexcore/hydra/preprod
 
@@ -606,6 +603,7 @@ sudo usermod -aG docker $USER
 ## B8. Chạy dự án
 
 ```bash
+pnpm build
 pnpm start:dev
 ```
 
@@ -645,13 +643,14 @@ cp .env.example .env
 # Sửa .env: CARDANO_CONNECTION_MODE=cardano-node + các biến NEST_CARDANO_NODE_*
 
 # 5. Khởi chạy MySQL
-cd configs/mysql-databases-redis && docker compose up -d && cd ../..
+cd configs/mysql-databases && docker compose up -d && cd ../..
 
 # 6. Phân quyền thư mục
 mkdir -p logs && chmod -R 755 logs
 
 # 7. Chạy project
-pnpm start:dev
+pnpm build
+pnpm start:prod
 
 # 8. Tạo admin & đăng ký provider (terminal khác)
 pnpm seed:run --path=src/migrations/seeders/create-account-admin.seeder.ts --username=admin --password=your_password
