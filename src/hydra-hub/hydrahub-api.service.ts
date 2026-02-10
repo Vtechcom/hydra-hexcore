@@ -1,7 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { AxiosRequestConfig } from 'axios';
-import { BaseApiService } from 'src/axios';
+import { BaseApiService } from '../axios';
 import { OnModuleInit } from '@nestjs/common';
 import { Injectable } from '@nestjs/common';
 import { HydraNode } from 'src/hydra-main/entities/HydraNode.entity';
@@ -43,9 +43,18 @@ export class HydraHubApiService extends BaseApiService implements OnModuleInit {
         };
     }
 
-    async syncHydraHeadStatus(body: { headId: number, status: string, nodes?: HydraNode[] }, config?: AxiosRequestConfig) {
+    async syncHydraHeadStatus(
+        body: { headId: number; status: string; nodes?: HydraNode[] },
+        config?: AxiosRequestConfig,
+    ) {
         const url = this.buildUrl(`/hydra-heads/webhook/async-head-status`);
         const requestConfig = this.buildConfig(config);
         return this.post<any>(url, body, requestConfig);
+    }
+
+    async sendAccessTokenToHub(body: { accessToken: string }, config?: AxiosRequestConfig) {
+        const url = this.buildUrl('/infrastruction-providers/webhook/access-token');
+        const requestConfig = this.buildConfig(config);
+        return this.patch<any>(url, body, requestConfig);
     }
 }

@@ -35,8 +35,9 @@ import { EventEnum } from 'src/event-listener/enums/event.enum';
 import { ActiveHydraHeadEvent } from 'src/event-listener/events/active-hydra-head.event';
 import { Cron } from '@nestjs/schedule';
 
-const TIMEOUT_NODE_READY_MS = 120000;
-const POLL_INTERVAL_NODE_READY_MS = 2000;
+const TIMEOUT_NODE_READY_MS = 300000;
+const POLL_INTERVAL_NODE_READY_MS = 3000;
+const PER_NODE_CHECK_TIMEOUT_MS = 15000;
 
 @Injectable()
 export class HydraHeadService {
@@ -636,10 +637,10 @@ export class HydraHeadService {
      * Check if a single Hydra node is ready by connecting to its WebSocket API
      * and waiting for a Greetings message (any headStatus: Idle, Open, Initializing, etc.)
      * @param port - The API port of the Hydra node
-     * @param timeoutMs - Maximum time to wait for the node to be ready (default: 60000ms)
+     * @param timeoutMs - Maximum time to wait for the node to be ready (default: 15000ms)
      * @returns Promise<boolean> - True if the node is ready, false otherwise
      */
-    async checkNodeReady(port: number, timeoutMs: number = 60000): Promise<boolean> {
+    async checkNodeReady(port: number, timeoutMs: number = 15000): Promise<boolean> {
         return new Promise(resolve => {
             const wsUrl = `ws://localhost:${port}`;
             let ws: WebSocket | null = null;
@@ -653,6 +654,7 @@ export class HydraHeadService {
                 }
                 if (ws) {
                     try {
+                        ws.removeAllListeners();
                         ws.close();
                     } catch (e) {
                         // Ignore close errors
@@ -679,12 +681,13 @@ export class HydraHeadService {
                 ws = new WebSocket(wsUrl);
 
                 ws.on('open', () => {
-                    this.logger.log(`WebSocket connected to node at port ${port}`);
+                    this.logger.log(`WebSocket connected to node at port ${port}, waiting for Greetings...`);
                 });
 
                 ws.on('message', (data: Buffer) => {
                     try {
                         const message = JSON.parse(data.toString());
+                        this.logger.log(`Received WS message from port ${port}: tag=${message.tag}`);
                         // Accept any Greetings message - node is ready regardless of headStatus
                         // Valid headStatus values: Idle, Initializing, Open, Closed, Final
                         if (message.tag === 'Greetings') {
@@ -697,12 +700,15 @@ export class HydraHeadService {
                 });
 
                 ws.on('error', (error: Error) => {
-                    this.logger.error(`WebSocket error for node at port ${port}: ${error.message}`);
-                    // Don't resolve yet, let it retry via timeout or next attempt
+                    this.logger.warn(`WebSocket error for node at port ${port}: ${error.message}`);
+                    // Resolve false immediately so waitForAllNodesReady can retry faster
+                    resolveOnce(false);
                 });
 
-                ws.on('close', () => {
-                    this.logger.log(`WebSocket closed for node at port ${port}`);
+                ws.on('close', (code: number, reason: Buffer) => {
+                    this.logger.log(`WebSocket closed for node at port ${port} (code: ${code}, reason: ${reason?.toString() || 'none'})`);
+                    // Resolve false immediately when connection closes without Greetings
+                    resolveOnce(false);
                 });
             } catch (error: any) {
                 this.logger.error(`Failed to connect to node at port ${port}: ${error.message}`);
@@ -743,7 +749,7 @@ export class HydraHeadService {
 
             // Check all pending nodes in parallel
             const checkPromises = pendingNodes.map(async node => {
-                const isReady = await this.checkNodeReady(node.port, 5000);
+                const isReady = await this.checkNodeReady(node.port, PER_NODE_CHECK_TIMEOUT_MS);
                 if (isReady) {
                     nodeStatuses.set(node.id, true);
                     this.logger.log(`Node ${node.id} (port ${node.port}) is now ready`);
@@ -990,7 +996,6 @@ export class HydraHeadService {
     @Cron('*/10 * * * * *')
     async checkNodeHealth(): Promise<void> {
         try {
-            this.logger.log('Running health check for Hydra Heads...');
             // Get all running heads in DB
             const runningHeads = await this.hydraHeadRepository.find({
                 where: { status: 'running' },
