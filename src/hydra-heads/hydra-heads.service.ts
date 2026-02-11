@@ -353,7 +353,8 @@ export class HydraHeadService {
                         
                         ...(this.configService.get('CARDANO_CONNECTION_MODE') === 'cardano-node'
                             ? [
-                                '--testnet-magic', `${this.hydraConfig.hydraNodeNetworkId}`,
+                                ...(this.configService.get('CARDANO_NETWORK') === 'testnet' ?
+                                ['--testnet-magic', `${this.hydraConfig.hydraNodeNetworkId}`] : ['--mainnet']),
                                 '--node-socket', `/cardano-node/node.socket`
                             ]
                             : ['--blockfrost', `/data/head-${head.id}/blockfrost-project.txt`]
@@ -706,7 +707,9 @@ export class HydraHeadService {
                 });
 
                 ws.on('close', (code: number, reason: Buffer) => {
-                    this.logger.log(`WebSocket closed for node at port ${port} (code: ${code}, reason: ${reason?.toString() || 'none'})`);
+                    this.logger.log(
+                        `WebSocket closed for node at port ${port} (code: ${code}, reason: ${reason?.toString() || 'none'})`,
+                    );
                     // Resolve false immediately when connection closes without Greetings
                     resolveOnce(false);
                 });
@@ -1022,9 +1025,7 @@ export class HydraHeadService {
                 }
                 try {
                     if (stoppedNodes.length > 0) {
-                        this.logger.warn(
-                            `Head ${head.id}: ${stoppedNodes.length}/${headNodes.length} nodes stopped`,
-                        );
+                        this.logger.warn(`Head ${head.id}: ${stoppedNodes.length}/${headNodes.length} nodes stopped`);
                         // Cập nhật DB
                         await this.hydraHeadRepository.update(head.id, { status: 'stop' });
                         // Sync với Hub

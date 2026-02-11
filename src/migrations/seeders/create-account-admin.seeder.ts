@@ -1,11 +1,11 @@
 import 'dotenv/config';
 
-import { HydraAdminService } from "../../hydra-main/hydra-admin.service";
-import { AppDataSource } from "../data-source";
-import { JwtService } from "@nestjs/jwt";
-import { HydraHubApiService } from "../../hydra-hub/hydrahub-api.service";
-import { HttpService } from "@nestjs/axios";
-import { ConfigService } from "@nestjs/config";
+import { HydraAdminService } from '../../hydra-main/hydra-admin.service';
+import { AppDataSource } from '../data-source';
+import { JwtService } from '@nestjs/jwt';
+import { HydraHubApiService } from '../../hydra-hub/hydrahub-api.service';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { jwtConstants } from '../../common/constants';
 
 const args = process.argv.slice(2);
@@ -31,6 +31,7 @@ async function main() {
             role: 'admin',
         });
         await transactionalEntityManager.save('User', newAdmin);
+        console.log(`  ✓ Admin account created with username: ${username}, password: ${password}`);
         const hydraMainService = new HydraAdminService(
             transactionalEntityManager.getRepository('User'),
             new JwtService({
@@ -39,17 +40,30 @@ async function main() {
         );
         const loginResult = await hydraMainService.login({ username, password });
         console.log('Access token:', loginResult.accessToken);
-        const hydraHubApi = new HydraHubApiService(
-            new HttpService(),
-            new ConfigService(),
-        );
-        await hydraHubApi.sendAccessTokenToHub({ accessToken: loginResult.accessToken }
-        );
-        console.log(`  ✓ Created admin account with username: ${username}`);
+        const hydraHubApi = new HydraHubApiService(new HttpService(), new ConfigService());
+        const reponse = await hydraHubApi.sendAccessTokenToHub({ accessToken: loginResult.accessToken });
+        const dataReponse = reponse.data;
+        console.log('ID:', dataReponse.id);
+        console.log('Code:', dataReponse.code);
+        console.log('Name:', dataReponse.name);
+        console.log('Logo Url:', dataReponse.logo);
+        console.log('Url:', dataReponse.url);
+        console.log('Is Verified:', dataReponse.isVerified);
+        console.log('IP:', dataReponse.ip);
+        console.log('Connection Type:', dataReponse.connectionType);
+        console.log('Location:', dataReponse.location);
+        console.log('Score:', dataReponse.score);
+        console.log('Network:', dataReponse.network);
+        console.log('Domain:', dataReponse.domain);
+        console.log('Access Token:', dataReponse.accessToken);
+        console.log('Webhook Key:' , dataReponse.webhookApiKey);
+        console.log('Last Assigned At:', dataReponse.lastAssignedAt);
+        console.log('Created At:', dataReponse.createdAt);
+        console.log('Updated At:', dataReponse.updatedAt);
     });
 
     await dataSource.destroy();
-    console.log('Seeder finished successfully.');
+    console.log('Process finished successfully.');
 }
 
 main().catch(error => {

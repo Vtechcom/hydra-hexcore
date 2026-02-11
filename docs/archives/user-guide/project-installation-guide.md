@@ -1,6 +1,9 @@
 # =============================
+
 # ENGLISH DOCUMENTATION
+
 # =============================
+
 # Project Installation & Configuration Guide (Linux)
 
 ## 1. Most Important Requirement
@@ -15,9 +18,9 @@
 ### 2.1. Create the .env file
 
 - Copy `.env.example` to `.env`:
-  ```sh
-  cp .env.example .env
-  ```
+    ```sh
+    cp .env.example .env
+    ```
 
 ### 2.2. Edit `.env` (explanation for each key variable)
 
@@ -26,11 +29,11 @@
   https://github.com/cardano-scaling/hydra-node/pkgs/container/hydra-node  
   or Cardano/Hydra official documentation.  
   (Each environment has a different script tx id, do NOT use a random value).
-- `NEST_HYDRA_NODE_NETWORK_ID`:  
-  - 1: mainnet  
-  - 0: preprod  
-  - 2: preview  
-  - ... (depending on your node environment)
+- `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`:
+    - 1: mainnet
+    - 0: preprod
+    - 2: preview
+    - ... (depending on your node environment)
 - `NEST_CARDANO_NODE_SERVICE_NAME`: Service name if you use docker-compose for cardano-node (e.g. `cardano-node`). If running node externally, you can ignore this.
 - `NEST_CARDANO_NODE_FOLDER`: Directory containing your `node.socket` (e.g. `/home/youruser/cardano-node`).
 - `NEST_CARDANO_NODE_SOCKET_PATH`: Absolute path to your `node.socket` (e.g. `/home/youruser/cardano-node/node.socket`).
@@ -41,11 +44,13 @@
 ### 3.1. Granting Permissions
 
 The user running hydra-hexcore must have read/write access to:
+
 - The directory and file for `node.socket` (and all parent directories).
 - The hydra data directory (`NEST_HYDRA_NODE_FOLDER`).
 - Any log or data directories used by the app.
 
 Example (replace with your actual paths):
+
 ```sh
 sudo chown -R $USER:$USER /home/youruser/cardano-node
 sudo chmod -R 777 /home/youruser/cardano-node
@@ -58,46 +63,49 @@ If running in Docker, make sure the container user has access to the mounted hos
 ### 3.2. Common Permission Errors & Solutions
 
 - **Error: `node.socket` not found or permission denied**
-  - Cause: The hydra-hexcore process cannot read the `node.socket` file.
-  - Solution: Ensure the path is correct and the user has read access. Use `ls -l` to check permissions. Fix with `sudo chown` and `sudo chmod` as above.
+    - Cause: The hydra-hexcore process cannot read the `node.socket` file.
+    - Solution: Ensure the path is correct and the user has read access. Use `ls -l` to check permissions. Fix with `sudo chown` and `sudo chmod` as above.
 - **Error: Cannot write to hydra data directory**
-  - Cause: The hydra-hexcore process cannot write to the directory specified in `NEST_HYDRA_NODE_FOLDER`.
-  - Solution: Grant write permissions as above.
+    - Cause: The hydra-hexcore process cannot write to the directory specified in `NEST_HYDRA_NODE_FOLDER`.
+    - Solution: Grant write permissions as above.
 - **Error: Docker container cannot access host files**
-  - Cause: Volume mount permissions are too restrictive.
-  - Solution: Use `chmod`/`chown` on the host, or run the container as the correct user.
+    - Cause: Volume mount permissions are too restrictive.
+    - Solution: Use `chmod`/`chown` on the host, or run the container as the correct user.
 
 ## 4. Docker Compose Configuration
 
 ### 4.1. Ogmios (if you want to use the provided Ogmios docker-compose)
 
 - Edit `configs/ogmios/docker-compose.yml`, update the `volumes` section:
-  ```yaml
-  volumes:
-    - /path/to/your/cardano-node:/cardano-node
-  ```
-  (Replace `/path/to/your/cardano-node` with the actual directory containing `node.socket` and `config.json`.)
+    ```yaml
+    volumes:
+        - /path/to/your/cardano-node:/cardano-node
+    ```
+    (Replace `/path/to/your/cardano-node` with the actual directory containing `node.socket` and `config.json`.)
 - Ensure the `command` section in docker-compose points to the correct file paths:
-  ```yaml
-  command:
-    [
-      "--node-socket", "/cardano-node/node.socket",
-      "--node-config", "/cardano-node/config.json",
-      "--host", "0.0.0.0"
-    ]
-  ```
+    ```yaml
+    command:
+        [
+            '--node-socket',
+            '/cardano-node/node.socket',
+            '--node-config',
+            '/cardano-node/config.json',
+            '--host',
+            '0.0.0.0',
+        ]
+    ```
 - From the `configs/ogmios` directory, run:
-  ```sh
-  docker compose up -d
-  ```
+    ```sh
+    docker compose up -d
+    ```
 
 ### 4.2. MySQL & Redis
 
 - Edit `configs/mysql-databases-redis/docker-compose.yaml` if you want to change the data storage location.
 - From the `configs/mysql-databases-redis` directory, run:
-  ```sh
-  docker compose up -d
-  ```
+    ```sh
+    docker compose up -d
+    ```
 
 ## 5. Build & Start hydra-hexcore
 
@@ -122,18 +130,23 @@ If you need more detailed instructions for any step, please ask!
 ---
 
 **Summary for using external cardano-node/ogmios:**
+
 - If you use an external cardano-node or ogmios, just set the correct path, host, and port in your `.env` file.
 - You do NOT need to run the cardano-node/ogmios docker-compose services from this project.
 - Make sure the user running hydra-hexcore has permission to access the `node.socket` file.
 
 **Additional notes:**
+
 - Make sure all service ports do not conflict with other applications on your machine.
 - If you encounter file or directory permission errors, check and fix permissions as described above.
 - For more details, see `README.md`, the `docs/` folder, or contact the project admin for support.
 
 # =============================
+
 # TÀI LIỆU HƯỚNG DẪN TIẾNG VIỆT
+
 # =============================
+
 # Hướng dẫn cài đặt & cấu hình hydra-hexcore (Linux)
 
 ## 1. Yêu cầu quan trọng nhất
@@ -148,9 +161,9 @@ If you need more detailed instructions for any step, please ask!
 ### 2.1. Tạo file cấu hình
 
 - Copy file mẫu `.env.example` thành `.env`:
-  ```sh
-  cp .env.example .env
-  ```
+    ```sh
+    cp .env.example .env
+    ```
 
 ### 2.2. Chỉnh sửa file `.env` (giải thích từng biến quan trọng)
 
@@ -159,11 +172,11 @@ If you need more detailed instructions for any step, please ask!
   https://github.com/cardano-scaling/hydra-node/pkgs/container/hydra-node  
   hoặc tài liệu chính thức của Cardano/Hydra.  
   (Mỗi môi trường sẽ có script tx id khác nhau, KHÔNG dùng bừa).
-- `NEST_HYDRA_NODE_NETWORK_ID`:  
-  - 1: mainnet  
-  - 0: preprod  
-  - 2: preview  
-  - ... (tùy môi trường bạn chạy node)
+- `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`:
+    - 1: mainnet
+    - 0: preprod
+    - 2: preview
+    - ... (tùy môi trường bạn chạy node)
 - `NEST_CARDANO_NODE_SERVICE_NAME`: Tên service cardano-node nếu bạn chạy bằng docker-compose (ví dụ: `cardano-node`). Nếu chạy node ngoài, có thể bỏ qua.
 - `NEST_CARDANO_NODE_FOLDER`: Thư mục chứa file `node.socket` của cardano-node bạn đang chạy (ví dụ: `/home/youruser/cardano-node`).
 - `NEST_CARDANO_NODE_SOCKET_PATH`: Đường dẫn tuyệt đối tới file `node.socket` (ví dụ: `/home/youruser/cardano-node/node.socket`).
@@ -174,11 +187,13 @@ If you need more detailed instructions for any step, please ask!
 ### 3.1. Phân quyền đúng cách
 
 User chạy hydra-hexcore cần có quyền đọc/ghi vào:
+
 - Thư mục và file `node.socket` (và tất cả thư mục cha).
 - Thư mục dữ liệu hydra (`NEST_HYDRA_NODE_FOLDER`).
 - Các thư mục log hoặc data khác mà app sử dụng.
 
 Ví dụ (thay đường dẫn cho đúng):
+
 ```sh
 sudo chown -R $USER:$USER /home/youruser/cardano-node
 sudo chmod -R 770 /home/youruser/cardano-node
@@ -191,46 +206,49 @@ Nếu chạy trong Docker, đảm bảo user trong container có quyền truy c�
 ### 3.2. Lỗi phân quyền thường gặp & cách xử lý
 
 - **Lỗi: Không tìm thấy hoặc không có quyền truy cập `node.socket`**
-  - Nguyên nhân: hydra-hexcore không đọc được file `node.socket`.
-  - Cách xử lý: Kiểm tra lại đường dẫn và quyền truy cập. Dùng `ls -l` để kiểm tra, sửa bằng `sudo chown` và `sudo chmod` như trên.
+    - Nguyên nhân: hydra-hexcore không đọc được file `node.socket`.
+    - Cách xử lý: Kiểm tra lại đường dẫn và quyền truy cập. Dùng `ls -l` để kiểm tra, sửa bằng `sudo chown` và `sudo chmod` như trên.
 - **Lỗi: Không ghi được vào thư mục dữ liệu hydra**
-  - Nguyên nhân: hydra-hexcore không ghi được vào thư mục `NEST_HYDRA_NODE_FOLDER`.
-  - Cách xử lý: Phân quyền ghi như trên.
+    - Nguyên nhân: hydra-hexcore không ghi được vào thư mục `NEST_HYDRA_NODE_FOLDER`.
+    - Cách xử lý: Phân quyền ghi như trên.
 - **Lỗi: Docker container không truy cập được file trên host**
-  - Nguyên nhân: Quyền mount volume trên host bị hạn chế.
-  - Cách xử lý: Sửa quyền trên host, hoặc chạy container với user phù hợp.
+    - Nguyên nhân: Quyền mount volume trên host bị hạn chế.
+    - Cách xử lý: Sửa quyền trên host, hoặc chạy container với user phù hợp.
 
 ## 4. Cấu hình docker-compose
 
 ### 4.1. Ogmios (nếu dùng docker-compose của dự án)
 
 - Sửa `configs/ogmios/docker-compose.yml`, phần `volumes`:
-  ```yaml
-  volumes:
-    - /duong/dan/den/cardano-node:/cardano-node
-  ```
-  (Thay `/duong/dan/den/cardano-node` bằng thư mục thật chứa `node.socket` và `config.json`.)
+    ```yaml
+    volumes:
+        - /duong/dan/den/cardano-node:/cardano-node
+    ```
+    (Thay `/duong/dan/den/cardano-node` bằng thư mục thật chứa `node.socket` và `config.json`.)
 - Đảm bảo phần `command` đúng đường dẫn file:
-  ```yaml
-  command:
-    [
-      "--node-socket", "/cardano-node/node.socket",
-      "--node-config", "/cardano-node/config.json",
-      "--host", "0.0.0.0"
-    ]
-  ```
+    ```yaml
+    command:
+        [
+            '--node-socket',
+            '/cardano-node/node.socket',
+            '--node-config',
+            '/cardano-node/config.json',
+            '--host',
+            '0.0.0.0',
+        ]
+    ```
 - Đứng tại `configs/ogmios` và chạy:
-  ```sh
-  docker compose up -d
-  ```
+    ```sh
+    docker compose up -d
+    ```
 
 ### 4.2. MySQL & Redis
 
 - Sửa `configs/mysql-databases-redis/docker-compose.yaml` nếu muốn thay đổi nơi lưu data.
 - Đứng tại `configs/mysql-databases-redis` và chạy:
-  ```sh
-  docker compose up -d
-  ```
+    ```sh
+    docker compose up -d
+    ```
 
 ## 5. Build & khởi động hydra-hexcore
 
@@ -251,11 +269,13 @@ pnpm start
 ---
 
 **Tóm tắt cấu hình node ngoài:**
+
 - Nếu bạn dùng cardano-node hoặc ogmios ngoài, chỉ cần chỉ đúng đường dẫn, host, port trong file `.env`.
 - Không cần chạy docker-compose phần cardano-node/ogmios của dự án.
 - Đảm bảo quyền truy cập file `node.socket` cho user chạy hydra-hexcore.
 
 **Lưu ý thêm:**
+
 - Đảm bảo các port dịch vụ không bị trùng lặp trên máy.
 - Nếu gặp lỗi quyền truy cập file hoặc thư mục, kiểm tra lại phân quyền như hướng dẫn trên.
 - Tham khảo thêm tài liệu chi tiết trong `README.md`, thư mục `docs/`, hoặc liên hệ admin dự án nếu cần hỗ trợ.
