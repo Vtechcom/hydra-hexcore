@@ -20,6 +20,7 @@ Dự án hỗ trợ **2 chế độ kết nối** vào mạng Cardano:
 - **pnpm** (khuyến nghị) — cài đặt: `npm install -g pnpm`
 - **Docker** & **Docker Compose**
 - **MySQL** 8.0+
+- **Ubuntu** >= 20.x
 - Tài khoản **Blockfrost** (lấy API key tại [https://blockfrost.io](https://blockfrost.io))
 
 ---
@@ -200,9 +201,6 @@ DB_SYNCHRONIZE=true
 ```dotenv
 # Linux / macOS
 NEST_DOCKER_SOCKET_PATH='/var/run/docker.sock'
-
-# Windows (bỏ comment dòng dưới, comment dòng trên)
-# NEST_DOCKER_SOCKET_PATH="\\.\pipe\docker_engine"
 
 NEST_DOCKER_ENABLE_NETWORK_HOST='false'
 ```
