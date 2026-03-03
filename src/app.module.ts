@@ -14,6 +14,7 @@ import { winstonConfig } from './config/winston.config';
 import { HydraHeadsModule } from './hydra-heads/hydra-heads.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { EventListenerModule } from './event-listener/event-listener.module';
+import { MonitoringAgentModule } from './monitoring-agent/monitoring-agent.module';
 
 @Module({
     imports: [
@@ -44,6 +45,7 @@ import { EventListenerModule } from './event-listener/event-listener.module';
         HydraMainModule,
         HydraHeadsModule,
         EventListenerModule,
+        MonitoringAgentModule,
         TypeOrmModule.forRootAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({
