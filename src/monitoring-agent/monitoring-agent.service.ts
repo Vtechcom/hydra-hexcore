@@ -31,6 +31,7 @@ export class MonitoringAgentService implements OnModuleInit, OnModuleDestroy {
     private readonly sendIntervalMs: number;
     private readonly exchange: string;
     private readonly routingKey: string;
+    private readonly rabbitMQReady: boolean = false;
 
     constructor(
         private readonly configService: ConfigService,
@@ -41,9 +42,13 @@ export class MonitoringAgentService implements OnModuleInit, OnModuleDestroy {
         this.sendIntervalMs = this.configService.get<number>('monitoringAgent.sendIntervalMs', 2000);
         this.exchange = this.configService.get<string>('rabbitmq.exchange', 'provider.metrics');
         this.routingKey = `metrics.${this.hubApiKey}`;
+        this.rabbitMQReady = this.configService.get<boolean>('rabbitmq.enabled', false);
     }
 
     async onModuleInit() {
+        if (!this.rabbitMQReady) {
+            return;
+        }
         if (!this.hubApiKey) {
             this.logger.error('HUB_API_KEY is not configured – Monitoring Agent will not start');
             return;
