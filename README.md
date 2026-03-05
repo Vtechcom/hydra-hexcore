@@ -69,6 +69,14 @@ DB_SYNCHRONIZE=true
 REDIS_URL=redis://localhost:6379
 REDIS_PASSWORD=
 
+# RabbitMQ Configuration
+RABBITMQ_ENABLED=true
+RABBITMQ_URI=amqp://guest:guest@localhost:5672
+RABBITMQ_QUEUE=hexcore.queue
+RABBITMQ_PREFETCH_COUNT=1
+RABBITMQ_NO_ACK=false
+RABBITMQ_QUEUE_DURABLE=true
+
 # Hydra Configuration
 NEST_HYDRA_BIN_DIR_PATH=/path/to/hydra/bin
 NEST_HYDRA_NODE_IMAGE=ghcr.io/cardano-scaling/hydra-node:0.19.0
@@ -83,6 +91,21 @@ NEST_CARDANO_NODE_SOCKER_PATH=/path/to/cardano-node/node.socket
 # Docker Configuration
 NEST_DOCKER_SOCKET_PATH=/var/run/docker.sock
 NEST_DOCKER_ENABLE_NETWORK_HOST=true
+```
+
+### RabbitMQ connection from ConfigService
+
+```ts
+const rabbit = this.configService.get('rabbitmq');
+
+// rabbit = {
+//   enabled,
+//   uri,
+//   queue,
+//   prefetchCount,
+//   noAck,
+//   queueDurable
+// }
 ```
 
 ### 4. Run with Docker Compose

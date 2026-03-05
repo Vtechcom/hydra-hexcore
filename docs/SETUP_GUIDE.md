@@ -229,6 +229,45 @@ PORT=3010
 LOG_DIR=logs
 ```
 
+### 2.8. Cấu hình RabbitMQ
+
+Hệ thống sử dụng **RabbitMQ** để gửi/nhận message với **Hydra Hub** (ví dụ: publish system metrics). Thông tin kết nối RabbitMQ (URI, exchange, queue, …) sẽ được **bên vận hành Hub cung cấp**. Liên hệ với bên quản lý Hub để nhận các thông tin này.
+
+```dotenv
+# Bật/tắt kết nối RabbitMQ (mặc định: false)
+RABBITMQ_ENABLED=false
+
+# URI kết nối RabbitMQ — do bên Hub cung cấp (format: amqp://user:password@host:port)
+RABBITMQ_URI=amqp://guest:guest@localhost:5672
+
+# Tên exchange — do bên Hub cung cấp
+RABBITMQ_EXCHANGE=provider.metrics
+
+# Tên queue — do bên Hub cung cấp
+RABBITMQ_QUEUE=hexcore.queue
+
+# Số lượng message prefetch trên mỗi consumer
+RABBITMQ_PREFETCH_COUNT=1
+
+# Tự động acknowledge message khi consume (true = không cần manual ack)
+RABBITMQ_NO_ACK=false
+
+# Queue có durable hay không (true = queue tồn tại sau khi RabbitMQ restart)
+RABBITMQ_QUEUE_DURABLE=true
+```
+
+| Biến môi trường           | Giá trị mặc định                     | Nguồn cung cấp | Mô tả                                         |
+| ------------------------- | ------------------------------------ | --------------- | ---------------------------------------------- |
+| `RABBITMQ_ENABLED`        | `false`                              | Tự cấu hình    | Bật/tắt kết nối RabbitMQ                       |
+| `RABBITMQ_URI`            | `amqp://guest:guest@localhost:5672`  | **Hub cung cấp** | URI kết nối AMQP (bao gồm user, pass, host, port) |
+| `RABBITMQ_EXCHANGE`       | `provider.metrics`                   | **Hub cung cấp** | Tên topic exchange                             |
+| `RABBITMQ_QUEUE`          | `hexcore.queue`                      | **Hub cung cấp** | Tên queue                                      |
+| `RABBITMQ_PREFETCH_COUNT` | `1`                                  | Tự cấu hình    | Số message prefetch mỗi consumer               |
+| `RABBITMQ_NO_ACK`         | `false`                              | Tự cấu hình    | Auto-acknowledge message                       |
+| `RABBITMQ_QUEUE_DURABLE`  | `true`                               | Tự cấu hình    | Queue tồn tại sau khi RabbitMQ restart         |
+
+> **Quan trọng:** Các giá trị `RABBITMQ_URI`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE` cần liên hệ với **bên vận hành Hub** để được cấp thông tin chính xác. Không tự ý thay đổi các giá trị này nếu không có hướng dẫn từ Hub.
+
 ---
 
 ## 3. Khởi chạy MySQL bằng Docker Compose
@@ -385,6 +424,7 @@ pnpm seed:run --path=src/migrations/seeders/create-account-admin.seeder.ts --use
 | `connect ENOENT .../node.socket`                             | Cardano Node chưa chạy hoặc chưa phân quyền socket | Kiểm tra cardano-node container đang chạy, chạy `chmod 777 node.socket`       |
 | `cardano-cli: Network.Socket.connect: ... permission denied` | `node.socket` chưa được phân quyền 777             | `chmod 777 /path/to/cardano-node/node.socket`                                 |
 | `Failed to query protocol parameters`                        | Cardano Node chưa sync xong                        | Đợi cardano-node đồng bộ xong blockchain, kiểm tra `docker logs cardano-node` |
+| `ECONNREFUSED 127.0.0.1:5672` (RabbitMQ)                     | RabbitMQ chưa chạy hoặc sai URI                   | Kiểm tra RabbitMQ đang chạy, kiểm tra `RABBITMQ_URI` trong `.env`             |
 
 ---
 
@@ -521,6 +561,20 @@ NEST_OGMIOS_PORT=1337
 PORT=3010
 LOG_DIR=logs
 ```
+
+### Cấu hình RabbitMQ (giống Phần A)
+
+```dotenv
+RABBITMQ_ENABLED=false
+RABBITMQ_URI=amqp://guest:guest@localhost:5672  #(Liên hệ với Hub để được cấp thông tin)
+RABBITMQ_EXCHANGE=provider.metrics               #(Liên hệ với Hub để được cấp thông tin)
+RABBITMQ_QUEUE=hexcore.queue                     #(Liên hệ với Hub để được cấp thông tin)
+RABBITMQ_PREFETCH_COUNT=1
+RABBITMQ_NO_ACK=false
+RABBITMQ_QUEUE_DURABLE=true
+```
+
+> Xem giải thích chi tiết các biến tại [mục 2.8 Phần A](#28-cấu-hình-rabbitmq). Thông tin `RABBITMQ_URI`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE` do **bên vận hành Hub cung cấp**.
 
 > **Lưu ý:** Tất cả đường dẫn trong `.env` **phải là đường dẫn tuyệt đối** (absolute path) vì chúng được dùng để mount vào Docker container. Thay `/home/user/hydra-hexcore/` bằng đường dẫn thực tế trên máy bạn.
 
@@ -665,3 +719,4 @@ pnpm seed:run --path=src/migrations/seeders/create-account-admin.seeder.ts --use
 | `Failed to query protocol parameters`                            | Cardano Node chưa sync xong                 | Đợi sync xong, kiểm tra `docker logs cardano-node`                  |
 | `OCI runtime exec failed: exec failed: container_name not found` | Tên container không đúng                    | Kiểm tra `NEST_CARDANO_NODE_SERVICE_NAME` khớp với `container_name` |
 | `No such file or directory: /cardano-node/node.socket`           | `NEST_CARDANO_NODE_FOLDER` sai đường dẫn    | Kiểm tra đường dẫn tuyệt đối và file `node.socket` tồn tại          |
+| `ECONNREFUSED 127.0.0.1:5672` (RabbitMQ)                         | RabbitMQ chưa chạy hoặc sai URI            | Kiểm tra RabbitMQ đang chạy, kiểm tra `RABBITMQ_URI` trong `.env`    |
