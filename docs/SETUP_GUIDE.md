@@ -189,10 +189,10 @@ NEST_HYDRA_NODE_FOLDER='/path/to/hydra/preprod'
 
 ```dotenv
 DB_HOST=localhost
-DB_PORT=3309
+DB_PORT=3327
 DB_USERNAME=hexcore_user
 DB_PASSWORD=hexcore_password
-DB_DATABASE=hexcore
+DB_DATABASE=hexcore_db
 DB_SYNCHRONIZE=true
 ```
 
@@ -584,7 +584,7 @@ DB_HOST=localhost
 DB_PORT=3327
 DB_USERNAME=hexcore_user
 DB_PASSWORD=hexcore_password
-DB_DATABASE=hexcore
+DB_DATABASE=hexcore_db
 DB_SYNCHRONIZE=true
 
 NEST_DOCKER_SOCKET_PATH='/var/run/docker.sock'
