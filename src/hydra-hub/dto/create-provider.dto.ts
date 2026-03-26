@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export enum ConnectionType {
     CARDANO_NODE = 'cardano_node',
@@ -28,20 +28,20 @@ export class CreateProviderDto {
         description: 'URL logo của provider',
         maxLength: 255,
     })
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
     @MaxLength(255)
-    logo: string;
+    logo?: string;
 
     @ApiProperty({
         example: 'https://alpha-infra.io',
-        description: 'URL trang chủ / API endpoint của provider',
+        description: 'URL website của provider',
         maxLength: 255,
     })
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
     @MaxLength(255)
-    url: string;
+    url?: string;
 
     @ApiProperty({
         example: '103.45.67.89',
