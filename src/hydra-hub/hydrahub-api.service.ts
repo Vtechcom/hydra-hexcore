@@ -5,6 +5,7 @@ import { BaseApiService } from '../axios';
 import { OnModuleInit } from '@nestjs/common';
 import { Injectable } from '@nestjs/common';
 import { HydraNode } from 'src/hydra-main/entities/HydraNode.entity';
+import { CreateProviderDto } from './dto/create-provider.dto';
 
 @Injectable()
 export class HydraHubApiService extends BaseApiService implements OnModuleInit {
@@ -54,6 +55,12 @@ export class HydraHubApiService extends BaseApiService implements OnModuleInit {
 
     async sendAccessTokenToHub(body: { accessToken: string }, config?: AxiosRequestConfig) {
         const url = this.buildUrl('/infrastruction-providers/webhook/access-token');
+        const requestConfig = this.buildConfig(config);
+        return this.patch<any>(url, body, requestConfig);
+    }
+
+    async createProvider(body: CreateProviderDto, config?: AxiosRequestConfig) {
+        const url = this.buildUrl('/infrastruction-providers/webhook/create');
         const requestConfig = this.buildConfig(config);
         return this.patch<any>(url, body, requestConfig);
     }

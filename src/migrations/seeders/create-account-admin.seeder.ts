@@ -56,7 +56,7 @@ async function main() {
         console.log('Network:', dataReponse.network);
         console.log('Domain:', dataReponse.domain);
         console.log('Access Token:', dataReponse.accessToken);
-        console.log('Webhook Key:' , dataReponse.webhookApiKey);
+        console.log('Webhook Key:', dataReponse.webhookApiKey);
         console.log('Last Assigned At:', dataReponse.lastAssignedAt);
         console.log('Created At:', dataReponse.createdAt);
         console.log('Updated At:', dataReponse.updatedAt);
