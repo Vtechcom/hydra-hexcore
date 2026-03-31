@@ -2,11 +2,11 @@
 
 Dự án hỗ trợ **2 chế độ kết nối** vào mạng Cardano:
 
-|             | Chế độ Blockfrost                | Chế độ Cardano Node                          |
-| ----------- | -------------------------------- | -------------------------------------------- |
-| **Độ khó**  | ⭐ Dễ — chỉ cần API key          | ⭐⭐⭐ Khó — phải tự chạy full node          |
-| **Yêu cầu** | Tài khoản Blockfrost             | Đã chạy thành công cardano-node              |
-| **Ưu điểm** | Nhanh, không cần sync blockchain | Không phụ thuộc bên thứ 3, chạy offline được |
+|             | Chế độ Blockfrost                | Chế độ Cardano Node                            |
+| ----------- | -------------------------------- | ---------------------------------------------- |
+| **Độ khó**  | ⭐ Dễ — chỉ cần API key          | ⭐⭐⭐ Khó — phải tự chạy full node            |
+| **Yêu cầu** | Tài khoản Blockfrost             | Đã chạy thành công `cardano-node`              |
+| **Ưu điểm** | Nhanh, không cần sync blockchain | Không phụ thuộc bên thứ 3, có thể chạy offline |
 
 > Chọn **một trong hai** chế độ và làm theo hướng dẫn tương ứng bên dưới.
 
@@ -14,18 +14,18 @@ Dự án hỗ trợ **2 chế độ kết nối** vào mạng Cardano:
 
 # Phần A — Chạy bằng Blockfrost
 
-## Yêu cầu hệ thống
+## A1. Yêu cầu hệ thống
 
 - **Node.js** >= 20.x
-- **pnpm** (khuyến nghị) — cài đặt: `npm install -g pnpm`
+- **pnpm** — cài đặt: `npm install -g pnpm`
 - **Docker** & **Docker Compose**
 - **MySQL** 8.0+
 - **Ubuntu** >= 20.x
-- Tài khoản **Blockfrost** (lấy API key tại [https://blockfrost.io](https://blockfrost.io))
+- Tài khoản **Blockfrost** (đăng ký miễn phí tại [blockfrost.io](https://blockfrost.io))
 
 ---
 
-## 1. Clone và cài đặt dependencies
+## A2. Clone và cài đặt dependencies
 
 ```bash
 git clone <repository-url>
@@ -35,37 +35,37 @@ pnpm install
 
 ---
 
-## 2. Cấu hình môi trường (.env)
+## A3. Cấu hình môi trường (.env)
 
-Copy file `.env.example` thành `.env`:
+Copy file mẫu:
 
 ```bash
 cp .env.example .env
 ```
 
-Mở file `.env` và chỉnh sửa các biến sau:
+Sau đó mở file `.env` và chỉnh sửa các biến theo hướng dẫn bên dưới.
 
-### 2.1. Cấu hình Blockfrost (chế độ kết nối Cardano)
+### A3.1. Chế độ kết nối Cardano → Blockfrost
 
 ```dotenv
-# Chọn chế độ kết nối: blockfrost hoặc cardano-node
+# Chọn chế độ kết nối
 CARDANO_CONNECTION_MODE=blockfrost
 
 # Lấy Project ID từ https://blockfrost.io/dashboard
 BLOCKFROST_PROJECT_ID=preprodXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-# Base URL cho Blockfrost API (preprod / mainnet)
+# Base URL của Blockfrost API (chọn đúng mạng: preprod hoặc mainnet)
 BLOCKFROST_API_BASE_URL=https://cardano-preprod.blockfrost.io/api/v0
 ```
 
-> **Lưu ý:** Đăng ký tài khoản Blockfrost miễn phí tại [blockfrost.io](https://blockfrost.io), tạo project trên mạng **Preprod** và lấy **Project ID**.
+> **Lưu ý:** Khi tạo project trên Blockfrost, chọn mạng **Preprod** để lấy Project ID tương ứng.
 
-### 2.2. Cấu hình Hydra Node
+### A3.2. Cấu hình Hydra Node
 
 ```dotenv
-# testnet hoặc mainnet
-# Nếu là testnet → hệ thống sẽ dùng --testnet-magic <NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID>
-# Nếu là mainnet → hệ thống sẽ dùng --mainnet (bỏ qua NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID)
+# Mạng Cardano đang dùng: testnet hoặc mainnet
+# testnet → dùng --testnet-magic <NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID>
+# mainnet → dùng --mainnet (bỏ qua NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID)
 CARDANO_NETWORK='testnet'
 
 NEST_HYDRA_NODE_IMAGE='ghcr.io/cardano-scaling/hydra-node:1.2.0'
@@ -74,42 +74,38 @@ NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID='1'
 NEST_HYDRA_NODE_FOLDER='/path/to/hydra/preprod'
 ```
 
-#### Cách lấy `NEST_HYDRA_NODE_IMAGE` (Docker Image)
+#### Cách lấy `NEST_HYDRA_NODE_IMAGE`
 
-Chọn phiên bản Hydra Node tại: [https://github.com/cardano-scaling/hydra/releases](https://github.com/cardano-scaling/hydra/releases)
+Xem danh sách phiên bản tại: [https://github.com/cardano-scaling/hydra/releases](https://github.com/cardano-scaling/hydra/releases)
 
 Format: `ghcr.io/cardano-scaling/hydra-node:<version>`
 
-Ví dụ:
-
 ```text
-ghcr.io/cardano-scaling/hydra-node:1.2.0   # Phiên bản mới nhất (khuyến nghị)
+ghcr.io/cardano-scaling/hydra-node:1.2.0   # Khuyến nghị
 ghcr.io/cardano-scaling/hydra-node:1.1.0
 ghcr.io/cardano-scaling/hydra-node:1.0.0
 ghcr.io/cardano-scaling/hydra-node:0.21.0
 ```
 
-> **Lưu ý:** Sau khi chọn phiên bản, cập nhật biến môi trường `NEST_HYDRA_NODE_IMAGE` trong `.env` cho khớp với version đã chọn.
-
 #### Cách lấy `NEST_HYDRA_NODE_SCRIPT_TX_ID`
 
-Mỗi phiên bản Hydra Node đều publish sẵn **Script TX IDs** cho từng mạng (preview, preprod, mainnet). Bạn cần lấy đúng TX ID tương ứng với **phiên bản Hydra Node** và **mạng Cardano** đang sử dụng.
+Mỗi phiên bản Hydra đều publish sẵn **Script TX IDs** cho từng mạng. Bạn cần lấy đúng TX ID tương ứng với phiên bản và mạng đang dùng.
 
-**Bước 1:** Truy cập trang release của phiên bản đã chọn:
+**Bước 1:** Vào trang release của phiên bản đó:
 
 ```text
 https://github.com/cardano-scaling/hydra/releases/tag/<version>
 ```
 
-**Bước 2:** Tìm mục **"Hydra Scripts"** trong trang release, lấy giá trị TX IDs tương ứng với mạng bạn đang dùng (`preview`, `preprod`, hoặc `mainnet`).
+**Bước 2:** Tìm mục **"Hydra Scripts"**, lấy TX IDs tương ứng với mạng (`preview`, `preprod`, hoặc `mainnet`).
 
-**Bước 3:** Hoặc truy cập trực tiếp file `networks.json` của phiên bản đó:
+**Bước 3:** Hoặc truy cập trực tiếp file `networks.json`:
 
 ```text
 https://raw.githubusercontent.com/cardano-scaling/hydra/<version>/hydra-node/networks.json
 ```
 
-Dưới đây là bảng Script TX IDs cho một số phiên bản phổ biến:
+Bảng tham khảo nhanh:
 
 <details>
 <summary><b>📋 Hydra v1.2.0 (mới nhất - khuyến nghị)</b></summary>
@@ -155,19 +151,19 @@ Dưới đây là bảng Script TX IDs cho một số phiên bản phổ biến:
 
 </details>
 
-> **Quan trọng:** Script TX IDs **phải khớp** với phiên bản Docker Image (`NEST_HYDRA_NODE_IMAGE`). Nếu dùng image `1.2.0` thì phải dùng TX IDs của phiên bản `1.2.0`.
+> **Quan trọng:** Script TX IDs **phải khớp** với phiên bản Docker Image (`NEST_HYDRA_NODE_IMAGE`). Ví dụ: dùng image `1.2.0` thì phải lấy TX IDs của phiên bản `1.2.0`.
 
 #### Cách chọn `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`
 
-| Mạng                  | `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`      |
+| Mạng                  | Giá trị                                      |
 | --------------------- | -------------------------------------------- |
 | **Preview** (testnet) | `2`                                          |
 | **Preprod** (testnet) | `1`                                          |
 | **Mainnet**           | Không cần (dùng `CARDANO_NETWORK='mainnet'`) |
 
-> **Lưu ý:** Khi `CARDANO_NETWORK='mainnet'`, hệ thống tự động dùng `--mainnet` và **bỏ qua** `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`.
+> Khi `CARDANO_NETWORK='mainnet'`, hệ thống tự dùng `--mainnet` và bỏ qua biến này.
 
-Ví dụ cấu hình cho **Preprod**:
+Ví dụ cấu hình đầy đủ cho mạng **Preprod**:
 
 ```dotenv
 NEST_HYDRA_NODE_IMAGE='ghcr.io/cardano-scaling/hydra-node:1.2.0'
@@ -178,14 +174,14 @@ NEST_HYDRA_NODE_FOLDER='/path/to/hydra/preprod'
 
 #### Bảng tương thích phiên bản
 
-| Hydra Version | cardano-node | cardano-cli | Docker Image Tag |
-| ------------- | ------------ | ----------- | ---------------- |
-| **1.2.0**     | 10.5.3       | 10.11.0.0   | `1.2.0`          |
-| **1.1.0**     | —            | —           | `1.1.0`          |
-| **1.0.0**     | 10.4.1       | 10.8.0.0    | `1.0.0`          |
-| **0.21.0**    | 10.1.4       | 10.1.1.0    | `0.21.0`         |
+| Hydra Version | cardano-node | cardano-cli |
+| ------------- | ------------ | ----------- |
+| **1.2.0**     | 10.5.3       | 10.11.0.0   |
+| **1.1.0**     | —            | —           |
+| **1.0.0**     | 10.4.1       | 10.8.0.0    |
+| **0.21.0**    | 10.1.4       | 10.1.1.0    |
 
-### 2.3. Cấu hình Database (MySQL)
+### A3.3. Cấu hình Database (MySQL)
 
 ```dotenv
 DB_HOST=localhost
@@ -196,88 +192,77 @@ DB_DATABASE=hexcore_db
 DB_SYNCHRONIZE=true
 ```
 
-### 2.4. Cấu hình Docker
+### A3.4. Cấu hình Docker
 
 ```dotenv
 # Linux / macOS
 NEST_DOCKER_SOCKET_PATH='/var/run/docker.sock'
-
 NEST_DOCKER_ENABLE_NETWORK_HOST='false'
 ```
 
-### 2.5. Cấu hình JWT & Hydra Hub
+### A3.5. Cấu hình JWT & Hydra Hub
 
 ```dotenv
-# Secret key dùng để tạo accessToken cho việc xác thực
+# Secret key dùng để ký JWT (đặt chuỗi ngẫu nhiên đủ dài)
 JWT_SECRET=your_jwt_secret_key
 
 # Base URL của Hydra Hub API
-# Môi trường dev: https://dev-api.hydrahub.io.vn/
-# Môi trường uat: https://uat-api.hydrahub.io.vn/
+# dev:  https://dev-api.hydrahub.io.vn/
+# uat:  https://uat-api.hydrahub.io.vn/
 HYDRA_HUB_API_BASE_URL=https://dev-api.hydrahub.io.vn/
 
-# Hub API Key — được gửi qua email sau khi tạo provider và được duyệt bởi Hydra Hub Team
+# API Key — được gửi qua email sau khi provider được Hydra Hub Team phê duyệt
 HUB_API_KEY=your_hub_api_key
 ```
 
-### 2.6. Giới hạn & Cấu hình khác
+### A3.6. Giới hạn & Cấu hình khác
 
 ```dotenv
-# Số lượng node tối đa có thể active cùng lúc
+# Số lượng Hydra Node có thể active đồng thời
 MAX_ACTIVE_NODES=20
 ```
 
-### 2.7. Port & Log
+### A3.7. Port & Log
 
 ```dotenv
 PORT=3010
 LOG_DIR=logs
 ```
 
-### 2.8. Cấu hình RabbitMQ
+### A3.8. Cấu hình RabbitMQ
 
-Hệ thống sử dụng **RabbitMQ** để gửi/nhận message với **Hydra Hub** (ví dụ: publish system metrics). Thông tin kết nối RabbitMQ (URI, exchange, queue, …) sẽ được **gửi qua email** khi provider được phê duyệt bởi Hydra Hub Team.
+Hệ thống dùng **RabbitMQ** để giao tiếp metric với **Hydra Hub**. Thông tin kết nối sẽ được **gửi qua email** khi provider được phê duyệt.
 
 ```dotenv
 # Bật/tắt kết nối RabbitMQ (mặc định: false)
 RABBITMQ_ENABLED=false
 
-# URI kết nối RabbitMQ — được cung cấp qua email khi provider được duyệt (format: amqp://user:password@host:port)
+# Các giá trị bên dưới được cung cấp qua email khi provider được duyệt
 RABBITMQ_URI=amqp://guest:guest@localhost:5672
-
-# Tên exchange — được cung cấp qua email khi provider được duyệt
 RABBITMQ_EXCHANGE=provider.metrics
-
-# Tên queue — được cung cấp qua email khi provider được duyệt
 RABBITMQ_QUEUE=hexcore.queue
 
-# Số lượng message prefetch trên mỗi consumer
+# Các giá trị tự cấu hình
 RABBITMQ_PREFETCH_COUNT=1
-
-# Tự động acknowledge message khi consume (true = không cần manual ack)
 RABBITMQ_NO_ACK=false
-
-# Queue có durable hay không (true = queue tồn tại sau khi RabbitMQ restart)
 RABBITMQ_QUEUE_DURABLE=true
 ```
 
-| Biến môi trường           | Giá trị mặc định                    | Nguồn cung cấp | Mô tả                                             |
-| ------------------------- | ----------------------------------- | -------------- | ------------------------------------------------- |
-| `RABBITMQ_ENABLED`        | `false`                             | Tự cấu hình    | Bật/tắt kết nối RabbitMQ                          |
-| `RABBITMQ_URI`            | `amqp://guest:guest@localhost:5672` | **Email**      | URI kết nối AMQP (bao gồm user, pass, host, port) |
-| `RABBITMQ_EXCHANGE`       | `provider.metrics`                  | **Email**      | Tên topic exchange                                |
-| `RABBITMQ_QUEUE`          | `hexcore.queue`                     | **Email**      | Tên queue                                         |
-| `RABBITMQ_PREFETCH_COUNT` | `1`                                 | Tự cấu hình    | Số message prefetch mỗi consumer                  |
-| `RABBITMQ_NO_ACK`         | `false`                             | Tự cấu hình    | Auto-acknowledge message                          |
-| `RABBITMQ_QUEUE_DURABLE`  | `true`                              | Tự cấu hình    | Queue tồn tại sau khi RabbitMQ restart            |
+| Biến môi trường           | Giá trị mặc định                    | Nguồn       | Mô tả                                     |
+| ------------------------- | ----------------------------------- | ----------- | ----------------------------------------- |
+| `RABBITMQ_ENABLED`        | `false`                             | Tự cấu hình | Bật/tắt kết nối RabbitMQ                  |
+| `RABBITMQ_URI`            | `amqp://guest:guest@localhost:5672` | **Email**   | URI kết nối AMQP (user, pass, host, port) |
+| `RABBITMQ_EXCHANGE`       | `provider.metrics`                  | **Email**   | Tên topic exchange                        |
+| `RABBITMQ_QUEUE`          | `hexcore.queue`                     | **Email**   | Tên queue                                 |
+| `RABBITMQ_PREFETCH_COUNT` | `1`                                 | Tự cấu hình | Số message prefetch mỗi consumer          |
+| `RABBITMQ_NO_ACK`         | `false`                             | Tự cấu hình | Auto-acknowledge message                  |
+| `RABBITMQ_QUEUE_DURABLE`  | `true`                              | Tự cấu hình | Queue tồn tại sau khi RabbitMQ restart    |
 
-> **Quan trọng:** Các giá trị `RABBITMQ_URI`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE` sẽ được gửi qua email đăng kí provider nếu provider được xét duyệt. Không tự ý thay đổi các giá trị này nếu không có hướng dẫn từ Hub.
+> **Lưu ý:** `RABBITMQ_URI`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE` sẽ được gửi qua email sau khi provider được phê duyệt. Không tự ý thay đổi nếu không có hướng dẫn từ Hub.
 
 ---
 
-## 3. Khởi chạy MySQL bằng Docker Compose
-
-Dự án đã cung cấp sẵn file Docker Compose cho MySQL:
+## A4. Khởi chạy MySQL bằng Docker Compose
 
 ```bash
 cd configs/mysql-databases
@@ -291,101 +276,86 @@ Sau khi khởi chạy:
 | ------- | --------- | ---- | ------------ | ---------------- |
 | MySQL   | localhost | 3327 | hexcore_user | hexcore_password |
 
-> Cập nhật file `.env` cho đúng port nếu dùng Docker Compose mặc định:
->
-> ```dotenv
-> DB_PORT=3327
-> DB_PASSWORD=hexcore_password
-> ```
+> Đảm bảo file `.env` có đúng `DB_PORT=3327` và `DB_PASSWORD=hexcore_password`.
 
 ---
 
-## 4. Phân quyền thư mục lưu trữ
-
-Đảm bảo các thư mục lưu trữ dữ liệu Hydra Node có quyền ghi:
+## A5. Phân quyền thư mục
 
 ```bash
-# Tạo thư mục logs nếu chưa có
+# Tạo thư mục logs
 mkdir -p logs
-
-# Tạo thư mục lưu trữ dữ liệu Hydra Node (persistence data và các key)
-mkdir -p /path/to/hydra/.../
-
-# Phân quyền cho thư mục Hydra Node
-chmod -R 755 /path/to/hydra/.../
-
-# Phân quyền cho thư mục logs
 chmod -R 755 logs
 
-# Đảm bảo Docker socket có thể truy cập
-# (Linux) Thêm user hiện tại vào group docker nếu chưa có
+# Tạo thư mục lưu dữ liệu Hydra Node (persistence và keys)
+mkdir -p /path/to/hydra/preprod
+chmod -R 755 /path/to/hydra/preprod
+
+# Cho phép Docker socket truy cập (thêm user vào group docker)
 sudo usermod -aG docker $USER
 ```
 
-> **Quan trọng:** Thay `/path/to/hydra/.../` bằng đường dẫn thực tế bạn đã cấu hình trong `NEST_HYDRA_NODE_FOLDER` ở file `.env`.
+> Thay `/path/to/hydra/preprod` bằng đường dẫn đã cấu hình trong `NEST_HYDRA_NODE_FOLDER`.
 
 ---
 
-## 5. Chạy dự án
+## A6. Chạy dự án
 
 ```bash
-# Build production
 pnpm build
-
-# Chạy production
 pnpm start:prod
 ```
 
-Server sẽ khởi chạy tại:
+Server khởi chạy tại:
 
 - **API:** `http://localhost:3010`
-- **Swagger docs:** `http://localhost:3010/api-docs`
+- **Swagger:** `http://localhost:3010/api-docs`
 
 ---
 
-## 6. Tạo tài khoản Admin & Đăng ký Provider
+## A7. Tạo tài khoản Admin & Đăng ký Provider
 
-Sau khi server chạy thành công và database đã được sync, chạy lệnh sau để tạo tài khoản admin và đăng ký provider:
+Sau khi server đã chạy và database đã sync, chạy lệnh sau để tạo admin và đăng ký provider lên Hydra Hub:
 
 ```bash
 pnpm seed:run --path=src/migrations/seeders/create-account-admin-and-provider.seeder.ts \
   --username=admin \
   --password=your_password \
   --ip=1.2.3.4 \
-  --providerName="My Provider" \
-  --logoUrl=https://example.com/logo.png \
-  --providerUrl=https://example.com \
-  --connectionType=blockfrost \
+  --provider-name="My Provider" \
+  --logo-url=https://example.com/logo.png \
+  --provider-url=https://example.com \
+  --connection-type=blockfrost \
   --network=preprod \
-  --domain=https://api.example.com \
+  --hexcore-url=https://api.example.com \
   --email=contact@example.com
 ```
 
-**Giải thích từng tham số:**
+**Giải thích các tham số:**
 
-| Tham số             | Bắt buộc | Mô tả                                                             |
-| ------------------- | -------- | ----------------------------------------------------------------- |
-| `--username=`       | ✅       | Tên đăng nhập cho tài khoản admin                                 |
-| `--password=`       | ✅       | Mật khẩu admin — tối thiểu **8 ký tự**, nên dùng mật khẩu mạnh    |
-| `--ip=`             | ✅       | Địa chỉ IPv4 của server provider (vd: `1.2.3.4`)                  |
-| `--providerName=`   | ✅       | Tên hiển thị của provider trên Hydra Hub                          |
-| `--logoUrl=`        | ❌       | URL ảnh logo của provider (phải là URL hợp lệ)                    |
-| `--providerUrl=`    | ❌       | URL website của company (phải là URL hợp lệ)                      |
-| `--connectionType=` | ✅       | Chế độ kết nối Cardano: `blockfrost` hoặc `cardano_node`          |
-| `--network=`        | ✅       | Mạng Cardano đang dùng: `mainnet`, `preprod`, hoặc `preview`      |
-| `--domain=`         | ✅       | Domain API công khai của provider (vd: `https://api.example.com`) |
-| `--email=`          | ✅       | Email nhận **Webhook API Key** — Hub sẽ gửi key về địa chỉ này    |
+| Tham số              | Bắt buộc | Mô tả                                                             |
+| -------------------- | -------- | ----------------------------------------------------------------- |
+| `--username=`        | ✅       | Tên đăng nhập cho tài khoản admin                                 |
+| `--password=`        | ✅       | Mật khẩu admin — tối thiểu **8 ký tự**, nên dùng mật khẩu mạnh    |
+| `--ip=`              | ✅       | Địa chỉ IPv4 public của server (vd: `1.2.3.4`)                    |
+| `--provider-name=`   | ✅       | Tên hiển thị của provider trên Hydra Hub                          |
+| `--logo-url=`        | ❌       | URL ảnh logo của provider                                         |
+| `--provider-url=`    | ❌       | URL website của provider/công ty                                  |
+| `--connection-type=` | ✅       | Chế độ kết nối: `blockfrost` hoặc `cardano_node`                  |
+| `--network=`         | ✅       | Mạng Cardano: `mainnet`, `preprod`, hoặc `preview`                |
+| `--hexcore-url=`     | ✅       | Domain API công khai của provider (vd: `https://api.example.com`) |
+| `--email=`           | ✅       | Email nhận **HUB API Key** — Hub sẽ gửi key về địa chỉ này        |
 
-Khi chạy thành công, sẽ:
+Khi chạy thành công, seeder sẽ:
 
 1. Xóa toàn bộ user cũ và tạo tài khoản admin mới trong database
 2. Tự động đăng nhập và lấy **Access Token**
 3. Gửi thông tin lên **Hydra Hub** để đăng ký provider
-4. Hydra Hub team sẽ xem xét và phê duyệt, nếu được xét duyệt **Webhook API Key** sẽ được gửi về địa chỉ email được cung cấp qua `--email=`
+4. Hub team phê duyệt xong → **HUB API Key** sẽ được gửi về email `--email=`
 
-> **Về Webhook API Key:** Đây là key dùng để xác thực các webhook request từ Hub gửi về server của bạn. Key này sẽ được Hub gửi vào email `--email=` sau khi đăng ký thành công và được duyệt. Hãy lưu lại và cấu hình vào `.env` với `HUB_API_KEY`.
+> **Về HUB API Key:** Đây là key dùng để xác thực các request từ Hub gửi về server của bạn. Sau khi nhận được, cập nhật vào `.env` với biến `HUB_API_KEY`.
 
-Output mẫu:
+Output mẫu khi chạy thành công:
 
 ```text
 Starting create account admin seeder...
@@ -407,75 +377,94 @@ Email: contact@example.com
 Process finished successfully.
 ```
 
-> **Lưu ý:** Seeder sẽ xóa toàn bộ user cũ trước khi tạo admin mới. Đảm bảo đã cấu hình `HYDRA_HUB_API_BASE_URL` trong `.env` để việc đăng ký provider lên Hub thành công.
+> **Lưu ý:** Seeder sẽ **xóa toàn bộ user cũ** trước khi tạo admin mới. Đảm bảo `HYDRA_HUB_API_BASE_URL` đã được cấu hình đúng trong `.env`.
+
+### A7.1. Cập nhật thông tin Provider
+
+Nếu cần thay đổi thông tin provider (tên, URL, logo, ...), chạy lại lệnh seeder với các tham số mới. **Giữ nguyên `--ip=`** để hệ thống nhận diện đây là cập nhật provider hiện tại, không phải đăng ký mới:
+
+```bash
+pnpm seed:run --path=src/migrations/seeders/create-account-admin-and-provider.seeder.ts \
+  --username=admin \
+  --password=your_new_password \
+  --ip=1.2.3.4 \
+  --provider-name="My Updated Provider" \
+  --logo-url=https://example.com/new-logo.png \
+  --provider-url=https://example.com \
+  --connection-type=blockfrost \
+  --network=preprod \
+  --hexcore-url=https://api.example.com \
+  --email=contact@example.com
+```
+
+> **Lưu ý:**
+>
+> - Nếu `--ip=` bị đổi khác với IP đang đăng ký, hệ thống sẽ xử lý như một **provider mới**.
+> - Sau khi cập nhật, vẫn cần chờ Hub Team **xét duyệt lại**. Nếu được duyệt, HUB API Key và các cấu hình liên quan có thể được cập nhật và gửi lại qua email.
 
 ---
 
-## 7. Sử dụng API _(tùy chọn)_
+## A8. Sử dụng API _(tùy chọn)_
 
-Sau khi tài khoản được phê duyệt, bạn có thể:
+Sau khi provider được phê duyệt:
 
-1. Truy cập Swagger UI tại `http://localhost:3010/api-docs`
+1. Truy cập **Swagger UI** tại `http://localhost:3010/api-docs`
 2. Đăng nhập với tài khoản admin để lấy JWT token
-3. Sử dụng token để gọi các API quản lý Hydra Head
+3. Dùng token để gọi API quản lý Hydra Head
 
 ---
 
-## Tổng hợp các bước nhanh
+## Tổng hợp các bước nhanh (Blockfrost)
 
 ```bash
 # 1. Cài đặt
 pnpm install
 
-# 2. Cấu hình
+# 2. Cấu hình .env
 cp .env.example .env
-# Sửa .env theo hướng dẫn ở trên
+# Chỉnh sửa .env theo hướng dẫn ở trên
 
 # 3. Khởi chạy database
 cd configs/mysql-databases && docker compose up -d && cd ../..
 
-# 4. Phân quyền
-mkdir -p logs
-chmod -R 755 logs
+# 4. Phân quyền thư mục
+mkdir -p logs && chmod -R 755 logs
 
-# 5. Chạy project
+# 5. Chạy server
 pnpm build
 pnpm start:prod
 
-# 6. Tạo admin & đăng ký provider (terminal khác)
+# 6. Tạo admin & đăng ký provider (mở terminal khác)
 pnpm seed:run --path=src/migrations/seeders/create-account-admin-and-provider.seeder.ts \
   --username=admin \
   --password=your_password \
   --ip=1.2.3.4 \
-  --providerName="My Provider" \
-  --connectionType=blockfrost \
+  --provider-name="My Provider" \
+  --connection-type=blockfrost \
   --network=preprod \
-  --domain=https://your-domain.com \
+  --hexcore-url=https://your-domain.com \
   --email=contact@example.com
 ```
 
 ---
 
-## Xử lý lỗi thường gặp
+## Xử lý lỗi thường gặp (Blockfrost)
 
-| Lỗi                                                          | Nguyên nhân                                        | Cách khắc phục                                                                |
-| ------------------------------------------------------------ | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `BlockFrost API configuration is missing`                    | Chưa cấu hình Blockfrost                           | Kiểm tra `BLOCKFROST_PROJECT_ID` trong `.env`                                 |
-| `ECONNREFUSED 127.0.0.1:3309`                                | MySQL chưa chạy                                    | Chạy `docker compose up -d` trong `configs/mysql-databases`                   |
-| `EACCES: permission denied`                                  | Không có quyền ghi thư mục                         | Chạy `chmod -R 755` cho thư mục tương ứng                                     |
-| `connect ENOENT /var/run/docker.sock`                        | Docker daemon chưa chạy                            | Khởi động Docker service                                                      |
-| `connect ENOENT .../node.socket`                             | Cardano Node chưa chạy hoặc chưa phân quyền socket | Kiểm tra cardano-node container đang chạy, chạy `chmod 777 node.socket`       |
-| `cardano-cli: Network.Socket.connect: ... permission denied` | `node.socket` chưa được phân quyền 777             | `chmod 777 /path/to/cardano-node/node.socket`                                 |
-| `Failed to query protocol parameters`                        | Cardano Node chưa sync xong                        | Đợi cardano-node đồng bộ xong blockchain, kiểm tra `docker logs cardano-node` |
-| `ECONNREFUSED 127.0.0.1:5672` (RabbitMQ)                     | RabbitMQ chưa chạy hoặc sai URI                    | Kiểm tra RabbitMQ đang chạy, kiểm tra `RABBITMQ_URI` trong `.env`             |
+| Lỗi                                       | Nguyên nhân                     | Cách khắc phục                                              |
+| ----------------------------------------- | ------------------------------- | ----------------------------------------------------------- |
+| `BlockFrost API configuration is missing` | Chưa cấu hình Blockfrost        | Kiểm tra `BLOCKFROST_PROJECT_ID` trong `.env`               |
+| `ECONNREFUSED 127.0.0.1:3309`             | MySQL chưa chạy                 | Chạy `docker compose up -d` trong `configs/mysql-databases` |
+| `EACCES: permission denied`               | Không có quyền ghi thư mục      | Chạy `chmod -R 755` cho thư mục tương ứng                   |
+| `connect ENOENT /var/run/docker.sock`     | Docker daemon chưa chạy         | Khởi động Docker service                                    |
+| `ECONNREFUSED 127.0.0.1:5672` (RabbitMQ)  | RabbitMQ chưa chạy hoặc sai URI | Kiểm tra RabbitMQ service và `RABBITMQ_URI` trong `.env`    |
 
 ---
 
 # Phần B — Chạy bằng Cardano Node
 
-> ⚠️ **Điều kiện tiên quyết:** Bạn phải **đã có kinh nghiệm** cài đặt và chạy thành công Cardano Node. Nếu chưa có kinh nghiệm, hãy làm theo **Phần A** (Blockfrost) ở trên.
+> ⚠️ **Điều kiện tiên quyết:** Bạn cần đã có kinh nghiệm cài đặt và chạy `cardano-node`. Nếu chưa, hãy thử **Phần A** (Blockfrost) trước.
 
-## B1. Cài đặt dependencies
+## B1. Clone và cài đặt dependencies
 
 ```bash
 git clone <repository-url>
@@ -483,22 +472,24 @@ cd hydra-hexcore
 pnpm install
 ```
 
+---
+
 ## B2. Chạy Cardano Node
 
-Trước khi tiếp tục, hãy đảm bảo bạn đã nắm rõ các thông tin sau về Cardano Node đang chạy:
+Trước khi tiếp tục, đảm bảo bạn đã nắm rõ về Cardano Node đang chạy:
 
-- **Tên container** (hoặc cách truy cập `cardano-cli`)
-- **Đường dẫn thư mục** chứa `node.socket`, `shelley-genesis.json` trên máy host
+- **Tên container** (hoặc cách gọi `cardano-cli`)
+- **Đường dẫn thư mục** chứa `node.socket` và `shelley-genesis.json` trên máy host
 - **Đường dẫn `node.socket`** bên trong container
 
-> **Quan trọng:** Phải đợi cardano-node **đồng bộ xong blockchain** trước khi tiếp tục. Quá trình sync có thể mất **vài giờ đến vài ngày** tuỳ mạng (preprod nhanh hơn mainnet).
+> **Quan trọng:** Phải đợi cardano-node **đồng bộ xong blockchain** trước khi tiếp tục. Quá trình này có thể mất **vài giờ đến vài ngày** tuỳ mạng.
 >
 > ```bash
 > # Theo dõi tiến trình sync
 > docker logs -f cardano-node
 > ```
 
-### Kiểm tra cardano-node đã sync xong
+Kiểm tra trạng thái sync:
 
 ```bash
 docker exec cardano-node cardano-cli query tip \
@@ -506,45 +497,45 @@ docker exec cardano-node cardano-cli query tip \
     --testnet-magic 1
 ```
 
-Nếu trả về JSON có `syncProgress: "100.00"` nghĩa là đã sync xong.
+Khi `syncProgress` trả về `"100.00"` là đã sync xong.
 
-## B3. Phân quyền cho `node.socket` và thư mục Cardano Node
+---
 
-**Bắt buộc** phân quyền `777` để Hydra Node container có thể truy cập socket:
+## B3. Phân quyền cho `node.socket`
+
+Bắt buộc phân quyền `777` để Hydra Node container có thể truy cập socket:
 
 ```bash
-# Phân quyền cho node.socket (BẮT BUỘC)
+# Phân quyền riêng cho file node.socket
 chmod 777 /path/to/cardano-node/node.socket
 
 # Phân quyền cho toàn bộ thư mục cardano-node
 chmod -R 777 /path/to/cardano-node/
 ```
 
-Ví dụ nếu dùng Docker Compose mặc định của dự án:
+Nếu dùng Docker Compose mặc định của dự án:
 
 ```bash
 chmod 777 configs/cardano/node.socket
 chmod -R 777 configs/cardano/
 ```
 
-> ⚠️ **Nếu không phân quyền**, Hydra Node sẽ báo lỗi `permission denied` hoặc `ENOENT node.socket` khi active head.
+> ⚠️ Nếu bỏ qua bước này, Hydra Node sẽ báo lỗi `permission denied` hoặc `ENOENT node.socket` khi active head.
 
-## B4. Cấu hình `.env`
+---
+
+## B4. Cấu hình môi trường (.env)
 
 ```bash
 cp .env.example .env
 ```
 
-Chỉnh sửa các biến sau:
-
-### Chế độ kết nối → `cardano-node`
+### Chế độ kết nối → Cardano Node
 
 ```dotenv
 CARDANO_CONNECTION_MODE=cardano-node
 
-# testnet hoặc mainnet
-# Nếu là testnet → hệ thống sẽ dùng --testnet-magic <NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID>
-# Nếu là mainnet → hệ thống sẽ dùng --mainnet (bỏ qua NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID)
+# Mạng Cardano: testnet hoặc mainnet
 CARDANO_NETWORK='testnet'
 ```
 
@@ -554,21 +545,21 @@ CARDANO_NETWORK='testnet'
 # Tên container cardano-node (phải trùng với container_name trong docker-compose)
 NEST_CARDANO_NODE_SERVICE_NAME='cardano-node'
 
-# Image cardano-node (chọn phiên bản tương thích với Hydra, xem bảng tương thích bên dưới)
+# Docker image cardano-node (xem bảng tương thích bên dưới)
 NEST_CARDANO_NODE_IMAGE='ghcr.io/intersectmbo/cardano-node:10.2.1'
 
-# Đường dẫn TUYỆT ĐỐI đến thư mục chứa file cấu hình cardano-node trên máy host
-# (chứa node.socket, shelley-genesis.json, config.json, ...)
-# Thư mục này sẽ được mount vào /cardano-node trong Hydra container
+# Đường dẫn TUYỆT ĐỐI đến thư mục chứa file cấu hình cardano-node trên host
+# (thư mục này chứa node.socket, shelley-genesis.json, config.json, ...)
+# Sẽ được mount vào /cardano-node bên trong Hydra container
 NEST_CARDANO_NODE_FOLDER='/home/user/hydra-hexcore/configs/cardano'
 
-# Đường dẫn TUYỆT ĐỐI đến node.socket trên máy host
+# Đường dẫn TUYỆT ĐỐI đến file node.socket trên host
 NEST_CARDANO_NODE_SOCKET_PATH='/home/user/hydra-hexcore/configs/cardano/node.socket'
 ```
 
 ### Cấu hình Hydra Node
 
-Xem hướng dẫn chi tiết cách lấy Script TX ID, Network ID ở [mục 2.2 Phần A](#22-cấu-hình-hydra-node).
+Cách lấy Script TX ID và Network ID xem tại [A3.2](#a32-cấu-hình-hydra-node).
 
 ```dotenv
 NEST_HYDRA_NODE_IMAGE='ghcr.io/cardano-scaling/hydra-node:1.2.0'
@@ -577,7 +568,16 @@ NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID='1'
 NEST_HYDRA_NODE_FOLDER='/home/user/hydra-hexcore/hydra/preprod'
 ```
 
-### Database, Docker, JWT, Log (giống Phần A)
+#### Bảng tương thích phiên bản (Cardano Node)
+
+| Hydra Version | cardano-node | cardano-cli |
+| ------------- | ------------ | ----------- |
+| **1.2.0**     | 10.5.3       | 10.11.0.0   |
+| **1.1.0**     | —            | —           |
+| **1.0.0**     | 10.4.1       | 10.8.0.0    |
+| **0.21.0**    | 10.1.4       | 10.1.1.0    |
+
+### Database, Docker, JWT, RabbitMQ (giống Phần A)
 
 ```dotenv
 DB_HOST=localhost
@@ -590,50 +590,34 @@ DB_SYNCHRONIZE=true
 NEST_DOCKER_SOCKET_PATH='/var/run/docker.sock'
 NEST_DOCKER_ENABLE_NETWORK_HOST='false'
 
-# Secret key dùng để tạo accessToken cho việc xác thực
 JWT_SECRET=your_jwt_secret_key
-
-# Base URL của Hydra Hub API
-# Môi trường dev: https://dev-api.hydrahub.io.vn/
-# Môi trường uat: https://uat-api.hydrahub.io.vn/
 HYDRA_HUB_API_BASE_URL=https://dev-api.hydrahub.io.vn/
-
-# Hub API Key — được gửi qua email sau khi tạo provider và được duyệt bởi Hydra Hub Team
 HUB_API_KEY=your_hub_api_key
 
-ACCOUNT_MIN_LOVELACE=50000000
 MAX_ACTIVE_NODES=20
-
-NEST_OGMIOS_HOST=localhost
-NEST_OGMIOS_PORT=1337
-
 PORT=3010
 LOG_DIR=logs
-```
 
-### Cấu hình RabbitMQ (giống Phần A)
-
-```dotenv
 RABBITMQ_ENABLED=false
-RABBITMQ_URI=amqp://guest:guest@localhost:5672    # Được cung cấp qua email khi provider được phê duyệt
-RABBITMQ_EXCHANGE=provider.metrics               # Được cung cấp qua email khi provider được phê duyệt
-RABBITMQ_QUEUE=hexcore.queue                     # Được cung cấp qua email khi provider được phê duyệt
+RABBITMQ_URI=amqp://guest:guest@localhost:5672
+RABBITMQ_EXCHANGE=provider.metrics
+RABBITMQ_QUEUE=hexcore.queue
 RABBITMQ_PREFETCH_COUNT=1
 RABBITMQ_NO_ACK=false
 RABBITMQ_QUEUE_DURABLE=true
 ```
 
-> Xem giải thích chi tiết các biến tại [mục 2.8 Phần A](#28-cấu-hình-rabbitmq). Các giá trị `RABBITMQ_URI`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE` sẽ được cung cấp qua email khi provider được phê duyệt.
+> Xem giải thích chi tiết các biến RabbitMQ tại [A3.8](#a38-cấu-hình-rabbitmq). Các giá trị `RABBITMQ_URI`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE` được cung cấp qua email khi provider được phê duyệt.
 
-> **Lưu ý:** Tất cả đường dẫn trong `.env` **phải là đường dẫn tuyệt đối** (absolute path) vì chúng được dùng để mount vào Docker container. Thay `/home/user/hydra-hexcore/` bằng đường dẫn thực tế trên máy bạn.
+> **Lưu ý:** Tất cả đường dẫn trong `.env` **phải là đường dẫn tuyệt đối** vì chúng được dùng để mount vào Docker container.
 
-## B5. Hiểu cách hệ thống hoạt động với Cardano Node
+---
 
-Khi active một Hydra Head, hệ thống thực hiện 2 việc liên quan đến cardano-node:
+## B5. Cách hệ thống hoạt động với Cardano Node
 
 ### 1) Query protocol parameters qua `cardano-cli`
 
-Hệ thống chạy lệnh sau để lấy protocol parameters từ cardano-node:
+Khi active Hydra Head, hệ thống chạy lệnh:
 
 ```bash
 docker exec cardano-node cardano-cli query protocol-parameters \
@@ -641,40 +625,27 @@ docker exec cardano-node cardano-cli query protocol-parameters \
     --testnet-magic 1
 ```
 
-Trong đó:
-
 - `cardano-node` — tên container (= `NEST_CARDANO_NODE_SERVICE_NAME`)
-- `/workspace/node.socket` — đường dẫn socket **bên trong container cardano-node** (được mount từ `configs/cardano/` → `/workspace/` theo docker-compose)
-- `--testnet-magic 1` — Network Magic Number (= `NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID`: 1 = Preprod, 2 = Preview). Nếu `CARDANO_NETWORK='mainnet'`, hệ thống sẽ dùng `--mainnet` thay thế.
-
-> Nếu bạn chạy cardano-node của riêng mình (không dùng docker-compose mặc định), cần đảm bảo đường dẫn socket và tên container trong source code khớp với cấu hình của bạn. Hiện tại các giá trị này đang hardcode trong source (xem `hydra-heads.service.ts` dòng 256-271).
+- `/workspace/node.socket` — đường dẫn socket **bên trong** container (được mount từ `configs/cardano/` → `/workspace/`)
+- `--testnet-magic 1` — Network Magic (1 = Preprod, 2 = Preview). Nếu `CARDANO_NETWORK='mainnet'`, dùng `--mainnet`.
 
 ### 2) Mount volume cho Hydra container
 
-Khi tạo Docker container cho Hydra Node:
-
 ```text
-Host (máy local)                                             →  Hydra Container
-──────────────────────────────────────────────────────────────────────────────────
-NEST_HYDRA_NODE_FOLDER   (vd: /home/user/hydra/preprod)      →  /data
-NEST_CARDANO_NODE_FOLDER (vd: /home/user/configs/cardano)    →  /cardano-node
+Host (máy local)                              →  Hydra Container
+────────────────────────────────────────────────────────────────
+NEST_HYDRA_NODE_FOLDER   (/home/user/hydra)   →  /data
+NEST_CARDANO_NODE_FOLDER (/home/user/cardano) →  /cardano-node
 ```
 
-Hydra Node trong container sẽ truy cập vào cardano-node socket qua `/cardano-node/node.socket`.
+Hydra Node truy cập cardano-node socket qua `/cardano-node/node.socket`.
 
-Vì vậy:
+Các điều kiện cần đảm bảo:
 
-- `NEST_CARDANO_NODE_FOLDER` phải trỏ đến thư mục chứa `node.socket` trên máy host
-- File `node.socket` trong thư mục đó phải có quyền `777`
+- `NEST_CARDANO_NODE_FOLDER` trỏ đến thư mục chứa `node.socket` trên máy host
+- File `node.socket` phải có quyền `777`
 
-### Bảng tương thích phiên bản
-
-| Hydra Version | cardano-node | cardano-cli | Docker Image Tag |
-| ------------- | ------------ | ----------- | ---------------- |
-| **1.2.0**     | 10.5.3       | 10.11.0.0   | `1.2.0`          |
-| **1.1.0**     | —            | —           | `1.1.0`          |
-| **1.0.0**     | 10.4.1       | 10.8.0.0    | `1.0.0`          |
-| **0.21.0**    | 10.1.4       | 10.1.1.0    | `0.21.0`         |
+---
 
 ## B6. Khởi chạy MySQL
 
@@ -684,74 +655,129 @@ docker compose up -d
 cd ../..
 ```
 
+---
+
 ## B7. Phân quyền thư mục lưu trữ
 
 ```bash
+# Thư mục logs
 mkdir -p logs
 chmod -R 755 logs
 
-# Tạo thư mục Hydra data (Thư mục lưu thông tin persistence và key sử dụng trong hydra node)
+# Thư mục Hydra data (persistence và keys)
 mkdir -p /home/user/hydra-hexcore/hydra/preprod
 chmod -R 755 /home/user/hydra-hexcore/hydra/preprod
 
-# Phân quyền toàn bộ thư mục cardano-node (chứa các file cấu hình và node.socket)
+# Thư mục cardano-node (chứa config và node.socket)
 chmod -R 777 /path/to/cardano-node/
-
-# Phân quyền riêng cho file node.socket
 chmod 777 /path/to/cardano-node/node.socket
 
+# Thêm user vào group docker
 sudo usermod -aG docker $USER
 ```
+
+---
 
 ## B8. Chạy dự án
 
 ```bash
 pnpm build
-pnpm start:dev
+pnpm start:prod
 ```
 
 - **API:** `http://localhost:3010`
-- **Swagger docs:** `http://localhost:3010/api-docs`
+- **Swagger:** `http://localhost:3010/api-docs`
+
+---
 
 ## B9. Tạo tài khoản Admin & Đăng ký Provider
+
+Sau khi server đã chạy và database đã sync, chạy lệnh sau để tạo admin và đăng ký provider lên Hydra Hub:
 
 ```bash
 pnpm seed:run --path=src/migrations/seeders/create-account-admin-and-provider.seeder.ts \
   --username=admin \
   --password=your_password \
   --ip=1.2.3.4 \
-  --providerName="My Provider" \
-  --logoUrl=https://example.com/logo.png \
-  --providerUrl=https://example.com \
-  --connectionType=cardano_node \
+  --provider-name="My Provider" \
+  --logo-url=https://example.com/logo.png \
+  --provider-url=https://example.com \
+  --connection-type=cardano_node \
   --network=preprod \
-  --domain=https://api.example.com \
+  --hexcore-url=https://api.example.com \
   --email=contact@example.com
 ```
 
-**Giải thích từng tham số:**
+**Giải thích các tham số:**
 
-| Tham số             | Bắt buộc | Mô tả                                    |
-| ------------------- | -------- | ---------------------------------------- |
-| `--username=`       | ✅       | Tên đăng nhập cho tài khoản admin        |
-| `--password=`       | ✅       | Mật khẩu admin — tối thiểu **8 ký tự**   |
-| `--ip=`             | ✅       | Địa chỉ IPv4 của server provider         |
-| `--providerName=`   | ✅       | Tên hiển thị của provider trên Hydra Hub |
-| `--logoUrl=`        | ❌       | URL ảnh logo (phải là URL hợp lệ)        |
-| `--providerUrl=`    | ❌       | URL website của provider                 |
-| `--connectionType=` | ✅       | `blockfrost` hoặc `cardano_node`         |
-| `--network=`        | ✅       | `mainnet`, `preprod`, hoặc `preview`     |
-| `--domain=`         | ✅       | Domain API công khai của provider        |
-| `--email=`          | ✅       | Email nhận **Webhook API Key** từ Hub    |
+| Tham số              | Bắt buộc | Mô tả                                                             |
+| -------------------- | -------- | ----------------------------------------------------------------- |
+| `--username=`        | ✅       | Tên đăng nhập cho tài khoản admin                                 |
+| `--password=`        | ✅       | Mật khẩu admin — tối thiểu **8 ký tự**, nên dùng mật khẩu mạnh    |
+| `--ip=`              | ✅       | Địa chỉ IPv4 public của server (vd: `1.2.3.4`)                    |
+| `--provider-name=`   | ✅       | Tên hiển thị của provider trên Hydra Hub                          |
+| `--logo-url=`        | ❌       | URL ảnh logo của provider                                         |
+| `--provider-url=`    | ❌       | URL website của provider/công ty                                  |
+| `--connection-type=` | ✅       | Chế độ kết nối: `blockfrost` hoặc `cardano_node`                  |
+| `--network=`         | ✅       | Mạng Cardano: `mainnet`, `preprod`, hoặc `preview`                |
+| `--hexcore-url=`     | ✅       | Domain API công khai của provider (vd: `https://api.example.com`) |
+| `--email=`           | ✅       | Email nhận **HUB API Key** — Hub sẽ gửi key về địa chỉ này        |
 
-Seeder sẽ:
+Khi chạy thành công, seeder sẽ:
 
 1. Xóa toàn bộ user cũ và tạo tài khoản admin mới trong database
 2. Tự động đăng nhập và lấy **Access Token**
 3. Gửi thông tin lên **Hydra Hub** để đăng ký provider
-4. Hub sẽ gửi **Webhook API Key** về địa chỉ email được cung cấp qua `--email=`
+4. Hub team phê duyệt xong → **HUB API Key** sẽ được gửi về email `--email=`
 
-> **Về Webhook API Key:** Key này dùng để xác thực webhook request từ Hub. Hub sẽ gửi key vào email `--email=` sau khi đăng ký provider và được phê duyệt thành công.
+> **Về HUB API Key:** Đây là key dùng để xác thực các request từ Hub gửi về server của bạn. Sau khi nhận được, cập nhật vào `.env` với biến `HUB_API_KEY`.
+
+Output mẫu khi chạy thành công:
+
+```text
+Starting create account admin seeder...
+  ✓ Admin account created with username: admin
+Access token: eyJhbGciOi...
+ID: 1
+Code: PRV-XXXX
+Name: My Provider
+Logo Url: https://example.com/logo.png
+Url: https://example.com
+Is Verified: false
+IP: 1.2.3.4
+Connection Type: cardano_node
+Network: preprod
+Domain: https://api.example.com
+Access Token: eyJhbGciOi...
+Webhook Key: whk_XXXX...
+Email: contact@example.com
+Process finished successfully.
+```
+
+> **Lưu ý:** Seeder sẽ **xóa toàn bộ user cũ** trước khi tạo admin mới. Đảm bảo `HYDRA_HUB_API_BASE_URL` đã được cấu hình đúng trong `.env`.
+
+### B9.1. Cập nhật thông tin Provider
+
+Nếu cần thay đổi thông tin provider (tên, URL, logo, ...), chạy lại lệnh seeder với các tham số mới. **Giữ nguyên `--ip=`** để hệ thống nhận diện đây là cập nhật provider hiện tại, không phải đăng ký mới:
+
+```bash
+pnpm seed:run --path=src/migrations/seeders/create-account-admin-and-provider.seeder.ts \
+  --username=admin \
+  --password=your_new_password \
+  --ip=1.2.3.4 \
+  --provider-name="My Updated Provider" \
+  --logo-url=https://example.com/new-logo.png \
+  --provider-url=https://example.com \
+  --connection-type=cardano_node \
+  --network=preprod \
+  --hexcore-url=https://api.example.com \
+  --email=contact@example.com
+```
+
+> **Lưu ý:**
+>
+> - Nếu `--ip=` bị đổi khác với IP đang đăng ký, hệ thống sẽ xử lý như một **provider mới**.
+> - Sau khi cập nhật, vẫn cần chờ Hub Team **xét duyệt lại**. Nếu được duyệt, HUB API Key và các cấu hình liên quan có thể được cập nhật và gửi lại qua email.
 
 ---
 
@@ -763,35 +789,35 @@ pnpm install
 
 # 2. Chạy Cardano Node (nếu chưa chạy)
 cd configs/cardano && docker compose up -d && cd ../..
-# Đợi sync xong! Kiểm tra: docker exec cardano-node cardano-cli query tip --socket-path /workspace/node.socket --testnet-magic 1
+# Đợi sync xong: docker exec cardano-node cardano-cli query tip --socket-path /workspace/node.socket --testnet-magic 1
 
 # 3. Phân quyền node.socket
-chmod 777 /path/cardano/node.socket
-chmod -R 777 /path/cardano/...
+chmod 777 /path/to/cardano/node.socket
+chmod -R 777 /path/to/cardano/
 
-# 4. Cấu hình
+# 4. Cấu hình .env
 cp .env.example .env
-# Sửa .env: CARDANO_CONNECTION_MODE=cardano-node + các biến NEST_CARDANO_NODE_*
+# Chỉnh: CARDANO_CONNECTION_MODE=cardano-node + các biến NEST_CARDANO_NODE_*
 
-# 5. Khởi chạy MySQL
+# 5. Khởi chạy database
 cd configs/mysql-databases && docker compose up -d && cd ../..
 
 # 6. Phân quyền thư mục
 mkdir -p logs && chmod -R 755 logs
 
-# 7. Chạy project
+# 7. Chạy server
 pnpm build
 pnpm start:prod
 
-# 8. Tạo admin & đăng ký provider (terminal khác)
+# 8. Tạo admin & đăng ký provider (mở terminal khác)
 pnpm seed:run --path=src/migrations/seeders/create-account-admin-and-provider.seeder.ts \
   --username=admin \
   --password=your_password \
   --ip=1.2.3.4 \
-  --providerName="My Provider" \
-  --connectionType=cardano_node \
+  --provider-name="My Provider" \
+  --connection-type=cardano_node \
   --network=preprod \
-  --domain=https://your-domain.com \
+  --hexcore-url=https://your-domain.com \
   --email=contact@example.com
 ```
 
@@ -799,11 +825,11 @@ pnpm seed:run --path=src/migrations/seeders/create-account-admin-and-provider.se
 
 ## Xử lý lỗi (Cardano Node)
 
-| Lỗi                                                              | Nguyên nhân                                 | Cách khắc phục                                                      |
-| ---------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------- |
-| `connect ENOENT .../node.socket`                                 | Cardano Node chưa chạy hoặc chưa phân quyền | Kiểm tra container đang chạy + `chmod 777 node.socket`              |
-| `cardano-cli: Network.Socket.connect: permission denied`         | `node.socket` chưa có quyền 777             | `chmod 777 /path/to/node.socket`                                    |
-| `Failed to query protocol parameters`                            | Cardano Node chưa sync xong                 | Đợi sync xong, kiểm tra `docker logs cardano-node`                  |
-| `OCI runtime exec failed: exec failed: container_name not found` | Tên container không đúng                    | Kiểm tra `NEST_CARDANO_NODE_SERVICE_NAME` khớp với `container_name` |
-| `No such file or directory: /cardano-node/node.socket`           | `NEST_CARDANO_NODE_FOLDER` sai đường dẫn    | Kiểm tra đường dẫn tuyệt đối và file `node.socket` tồn tại          |
-| `ECONNREFUSED 127.0.0.1:5672` (RabbitMQ)                         | RabbitMQ chưa chạy hoặc sai URI             | Kiểm tra RabbitMQ đang chạy, kiểm tra `RABBITMQ_URI` trong `.env`   |
+| Lỗi                                                      | Nguyên nhân                                 | Cách khắc phục                                                      |
+| -------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------- |
+| `connect ENOENT .../node.socket`                         | Cardano Node chưa chạy hoặc chưa phân quyền | Kiểm tra container đang chạy + `chmod 777 node.socket`              |
+| `cardano-cli: Network.Socket.connect: permission denied` | `node.socket` chưa có quyền 777             | `chmod 777 /path/to/node.socket`                                    |
+| `Failed to query protocol parameters`                    | Cardano Node chưa sync xong                 | Đợi sync xong, kiểm tra `docker logs cardano-node`                  |
+| `OCI runtime exec failed: container_name not found`      | Tên container không đúng                    | Kiểm tra `NEST_CARDANO_NODE_SERVICE_NAME` khớp với `container_name` |
+| `No such file or directory: /cardano-node/node.socket`   | `NEST_CARDANO_NODE_FOLDER` sai đường dẫn    | Kiểm tra đường dẫn tuyệt đối và file `node.socket` tồn tại          |
+| `ECONNREFUSED 127.0.0.1:5672` (RabbitMQ)                 | RabbitMQ chưa chạy hoặc sai URI             | Kiểm tra RabbitMQ service và `RABBITMQ_URI` trong `.env`            |

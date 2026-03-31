@@ -7,10 +7,61 @@ import { HydraHubApiService } from '../../hydra-hub/hydrahub-api.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { jwtConstants } from '../../common/constants';
-import { email, z } from 'zod';
+import { z } from 'zod';
 
 const args = process.argv.slice(2);
-const parseArg = (prefix: string): string | undefined => args.find(a => a.startsWith(prefix))?.slice(prefix.length);
+
+const parseArg = (prefix: string): string | undefined => {
+    const raw = args.find(a => a.startsWith(prefix));
+    if (raw) {
+        const baseValue = raw.slice(prefix.length);
+        const startIndex = args.indexOf(raw);
+        let value = baseValue;
+
+        // Handle broken split arguments like `--providerName=My Provider` in PowerShell
+        // where shell tokenizes as ['--providerName=My', 'Provider', ...]
+        let i = startIndex + 1;
+        while (i < args.length && !args[i].startsWith('--')) {
+            value = `${value} ${args[i]}`;
+            i += 1;
+        }
+
+        return value || undefined;
+    }
+
+    const key = prefix.slice(0, -1); // '--name=' => '--name'
+    const idx = args.findIndex(a => a === key);
+    if (idx >= 0 && idx + 1 < args.length) {
+        return args[idx + 1] || undefined;
+    }
+
+    return undefined;
+};
+
+const credentialSchema = z.object({
+    username: z.string().min(1, 'username must not be empty'),
+    password: z.string().min(8, 'password must be at least 8 characters'),
+});
+
+const providerSchema = z.object({
+    ip: z
+        .string()
+        .regex(
+            /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
+            'ip must be a valid IPv4 address',
+        ),
+    name: z.string().min(1, 'provider-name must not be empty'),
+    logo: z.string().url('logo-url must be a valid URL').optional(),
+    url: z.string().url('provider-url must be a valid URL').optional(),
+    connectionType: z.enum(['cardano_node', 'blockfrost'], {
+        error: 'connection-type must be "cardano_node" or "blockfrost"',
+    }),
+    network: z.enum(['mainnet', 'preprod', 'preview'], {
+        error: 'network must be "mainnet", "preprod", or "preview"',
+    }),
+    domain: z.string().url('hexcore-url must be a valid URL'),
+    email: z.string().email('email must be a valid email address'),
+});
 
 const username = parseArg('--username=');
 const password = parseArg('--password=');
@@ -20,33 +71,32 @@ if (!username || !password) {
     process.exit(1);
 }
 
-const credentialSchema = z.object({
-    username: z.string().min(1),
-    password: z.string().min(8),
-});
+const credentialResult = credentialSchema.safeParse({ username, password });
+if (!credentialResult.success) {
+    console.error('Invalid credentials:');
+    credentialResult.error.issues.forEach(e => console.error(`  - ${e.path.join('.')}: ${e.message}`));
+    process.exit(1);
+}
 
-const providerSchema = z.object({
-    ip: z.string().regex(/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/),
-    name: z.string(),
-    logo: z.string().url().optional(),
-    url: z.string().url().optional(),
-    connectionType: z.enum(['cardano_node', 'blockfrost']),
-    network: z.enum(['mainnet', 'preprod', 'preview']),
-    domain: z.string(),
-    email: email(),
-});
-
-const credentials = credentialSchema.parse({ username, password });
-const providerArgs = providerSchema.parse({
+const providerResult = providerSchema.safeParse({
     ip: parseArg('--ip='),
-    name: parseArg('--providerName='),
-    logo: parseArg('--logoUrl='),
-    url: parseArg('--providerUrl='),
-    connectionType: parseArg('--connectionType='),
+    name: parseArg('--provider-name='),
+    logo: parseArg('--logo-url='),
+    url: parseArg('--provider-url='),
+    connectionType: parseArg('--connection-type='),
     network: parseArg('--network='),
-    domain: parseArg('--domain='),
+    domain: parseArg('--hexcore-url='),
     email: parseArg('--email='),
 });
+
+if (!providerResult.success) {
+    console.error('Invalid provider arguments:');
+    providerResult.error.issues.forEach(e => console.error(`  - ${e.path.join('.')}: ${e.message}`));
+    process.exit(1);
+}
+
+const credentials = credentialResult.data;
+const providerArgs = providerResult.data;
 
 async function main() {
     console.log('Starting create account admin seeder...');
@@ -56,6 +106,7 @@ async function main() {
 
     await dataSource.transaction(async transactionalEntityManager => {
         await transactionalEntityManager.getRepository('User').clear();
+
         const newAdmin = transactionalEntityManager.getRepository('User').create({
             username: credentials.username,
             password: credentials.password,
@@ -63,17 +114,21 @@ async function main() {
         });
         await transactionalEntityManager.save('User', newAdmin);
         console.log(`  ✓ Admin account created with username: ${credentials.username}`);
+
         const hydraAdminService = new HydraAdminService(
             transactionalEntityManager.getRepository('User'),
             new JwtService({ secret: jwtConstants.secret }),
         );
+
         const loginResult = await hydraAdminService.login(credentials);
         console.log('Access token:', loginResult.accessToken);
+
         const hydraHubApi = new HydraHubApiService(new HttpService(), new ConfigService());
         const response = await hydraHubApi.createProvider({
             ...providerArgs,
             accessToken: loginResult.accessToken,
         } as any);
+
         const data = response.data;
         console.log('ID:', data.id);
         console.log('Code:', data.code);
@@ -89,7 +144,7 @@ async function main() {
         console.log('Domain:', data.domain);
         console.log('Access Token:', data.accessToken);
         console.log('Webhook Key:', data.webhookApiKey);
-        console.log('Email', data.email);
+        console.log('Email:', data.email);
         console.log('Last Assigned At:', data.lastAssignedAt);
         console.log('Created At:', data.createdAt);
         console.log('Updated At:', data.updatedAt);
