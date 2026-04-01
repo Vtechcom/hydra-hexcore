@@ -1,3 +1,5 @@
+🌐 **Language / 言語 / Ngôn ngữ:** English | [日本語](README_JP.md) | [Tiếng Việt](README_VI.md)
+
 # Hydra HexCore
 
 Hydra HexCore is a backend service built with NestJS for managing and interacting with Hydra Head - a layer 2 scaling solution for the Cardano blockchain. The application provides APIs for managing Hydra nodes, processing transactions, and managing multi-party operations on Cardano.
@@ -22,116 +24,144 @@ The application is divided into main modules:
 
 ## 📋 System Requirements
 
-- Node.js 20+
-- Docker & Docker Compose
-- MySQL 8.0+ or SQLite
-- Redis (optional, for caching)
-- Cardano Node
-- Hydra Node binaries
+- **Node.js** >= 20.x
+- **pnpm** (`npm install -g pnpm`)
+- **Docker** & **Docker Compose**
+- **MySQL** 8.0+
+- **Ubuntu** >= 20.x
+- One of:
+    - A **Blockfrost** account (easy mode — just an API key), OR
+    - A running **Cardano Node** (advanced — requires full node sync)
 
-## 🛠️ Installation
+## 🛠️ Installation & Setup (Quick Start)
 
-### 1. Clone repository
+The project supports **2 connection modes** to the Cardano network:
+
+|                | Blockfrost Mode             | Cardano Node Mode                          |
+| -------------- | --------------------------- | ------------------------------------------ |
+| **Difficulty** | ⭐ Easy — only need API key | ⭐⭐⭐ Hard — must run full node           |
+| **Requires**   | Blockfrost account          | Running `cardano-node`                     |
+| **Pros**       | Fast, no blockchain sync    | No third-party dependency, can run offline |
+
+> 📖 **Full detailed guide:** [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)
+
+### 1. Clone & install
 
 ```bash
 git clone <repository-url>
 cd hydra-hexcore
+pnpm install
 ```
 
-### 2. Install dependencies
+### 2. Configure environment
 
 ```bash
-# Using pnpm (recommended)
-pnpm install
-
-# Or npm
-npm install
+cp .env.example .env
 ```
 
-### 3. Environment configuration
-
-Create a `.env` file and configure environment variables:
+Key environment variables to configure:
 
 ```env
-# Server Configuration
-PORT=3010
-NODE_ENV=development
+# Connection mode: "blockfrost" or "cardano-node"
+CARDANO_CONNECTION_MODE=blockfrost
 
-# Database Configuration
+# Blockfrost (if using blockfrost mode)
+BLOCKFROST_PROJECT_ID=preprodXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+BLOCKFROST_API_BASE_URL=https://cardano-preprod.blockfrost.io/api/v0
+
+# Cardano Network
+CARDANO_NETWORK='testnet'
+
+# Hydra Node
+NEST_HYDRA_NODE_IMAGE='ghcr.io/cardano-scaling/hydra-node:1.2.0'
+NEST_HYDRA_NODE_SCRIPT_TX_ID='<script-tx-ids-for-your-version-and-network>'
+NEST_HYDRA_NODE_TEST_NETWORK_MAGIC_ID='1'
+NEST_HYDRA_NODE_FOLDER='/path/to/hydra/preprod'
+
+# Database
 DB_HOST=localhost
-DB_PORT=3306
-DB_USERNAME=root
-DB_PASSWORD=your_password
-DB_DATABASE=hexcore
+DB_PORT=3327
+DB_USERNAME=hexcore_user
+DB_PASSWORD=hexcore_password
+DB_DATABASE=hexcore_db
 DB_SYNCHRONIZE=true
 
-# Redis Configuration
-REDIS_URL=redis://localhost:6379
-REDIS_PASSWORD=
+# Docker
+NEST_DOCKER_SOCKET_PATH='/var/run/docker.sock'
+NEST_DOCKER_ENABLE_NETWORK_HOST='false'
 
-# RabbitMQ Configuration
-RABBITMQ_ENABLED=true
+# JWT & Hydra Hub
+JWT_SECRET=your_jwt_secret_key
+HYDRA_HUB_API_BASE_URL=https://dev-api.hydrahub.io.vn/
+HUB_API_KEY=your_hub_api_key
+
+# RabbitMQ (optional, enabled after provider approval)
+RABBITMQ_ENABLED=false
 RABBITMQ_URI=amqp://guest:guest@localhost:5672
+RABBITMQ_EXCHANGE=provider.metrics
 RABBITMQ_QUEUE=hexcore.queue
-RABBITMQ_PREFETCH_COUNT=1
-RABBITMQ_NO_ACK=false
-RABBITMQ_QUEUE_DURABLE=true
 
-# Hydra Configuration
-NEST_HYDRA_BIN_DIR_PATH=/path/to/hydra/bin
-NEST_HYDRA_NODE_IMAGE=ghcr.io/cardano-scaling/hydra-node:0.19.0
-NEST_HYDRA_NODE_FOLDER=/path/to/hydra/preprod
-
-# Cardano Configuration
-NEST_CARDANO_NODE_SERVICE_NAME=cardano-node
-NEST_CARDANO_NODE_IMAGE=ghcr.io/intersectmbo/cardano-node:10.1.4
-NEST_CARDANO_NODE_FOLDER=/path/to/cardano-node
-NEST_CARDANO_NODE_SOCKER_PATH=/path/to/cardano-node/node.socket
-
-# Docker Configuration
-NEST_DOCKER_SOCKET_PATH=/var/run/docker.sock
-NEST_DOCKER_ENABLE_NETWORK_HOST=true
+# Server
+PORT=3010
+MAX_ACTIVE_NODES=20
+LOG_DIR=logs
 ```
 
-### RabbitMQ connection from ConfigService
+> See [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) for full explanation of each variable, Hydra Script TX IDs per version/network, and version compatibility tables.
 
-```ts
-const rabbit = this.configService.get('rabbitmq');
-
-// rabbit = {
-//   enabled,
-//   uri,
-//   queue,
-//   prefetchCount,
-//   noAck,
-//   queueDurable
-// }
-```
-
-### 4. Run with Docker Compose
+### 3. Start MySQL
 
 ```bash
-docker-compose up -d
+cd configs/mysql-databases && docker compose up -d && cd ../..
 ```
 
-### 5. Run development mode
+### 4. Set up directories & permissions
 
 ```bash
-# Development
-pnpm run start:dev
+mkdir -p logs && chmod -R 755 logs
+mkdir -p /path/to/hydra/preprod && chmod -R 755 /path/to/hydra/preprod
+sudo usermod -aG docker $USER
+```
 
-# Debug mode
-pnpm run start:debug
+> **Cardano Node mode only:** also run `chmod 777 /path/to/cardano-node/node.socket`
 
+### 5. Build & run
+
+```bash
 # Production
-pnpm run start:prod
+pnpm build
+pnpm start:prod
+
+# Or development mode
+pnpm run start:dev
 ```
+
+Server starts at: **API** `http://localhost:3010` | **Swagger** `http://localhost:3010/api-docs`
+
+### 6. Create admin account & register provider
+
+```bash
+pnpm seed:run --path=src/migrations/seeders/create-account-admin-and-provider.seeder.ts \
+  --username=admin \
+  --password=your_password \
+  --ip=1.2.3.4 \
+  --provider-name="My Provider" \
+  --connection-type=blockfrost \
+  --network=preprod \
+  --hexcore-url=https://your-domain.com \
+  --email=contact@example.com
+```
+
+After approval by the Hub team, you will receive a **HUB API Key** via email — update `HUB_API_KEY` in `.env`.
+
+> See [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) for full parameter reference, provider update instructions, Cardano Node specific setup, and troubleshooting.
 
 ## 📚 API Documentation
 
 ### Hydra Management APIs
 
 #### Create Account
+
 ```http
 POST /hydra/account
 Content-Type: application/json
@@ -142,6 +172,7 @@ Content-Type: application/json
 ```
 
 #### Create Party
+
 ```http
 POST /hydra/party
 Content-Type: application/json
@@ -153,6 +184,7 @@ Content-Type: application/json
 ```
 
 #### Create Hydra Node
+
 ```http
 POST /hydra/node
 Content-Type: application/json
@@ -164,6 +196,7 @@ Content-Type: application/json
 ```
 
 #### Commit to Hydra
+
 ```http
 POST /hydra/commit
 Content-Type: application/json
@@ -175,6 +208,7 @@ Content-Type: application/json
 ```
 
 #### Submit Transaction
+
 ```http
 POST /hydra/submit-tx
 Content-Type: application/json
@@ -188,6 +222,7 @@ Content-Type: application/json
 ### Admin APIs
 
 #### Admin Login
+
 ```http
 POST /hydra/admin/login
 Content-Type: application/json
